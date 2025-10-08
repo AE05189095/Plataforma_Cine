@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 minutos
+const INACTIVITY_LIMIT = 30 * 60 * 1000; // 5 minutos
 
 export default function InactivityLogout() {
   const router = useRouter();
