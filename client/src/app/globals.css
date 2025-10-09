@@ -1,8 +1,14 @@
+/* global.css */
+
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Ya no son estrictamente necesarios aquí, pero los mantenemos */
+  --color-primary: #dc2626;  
+  --color-link: #f87171;    
 }
 
 @theme inline {
@@ -14,12 +20,17 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    /* Estos colores están definidos, pero las clases de Tailwind en page.tsx tienen prioridad. */
+    --background: #0a0a0a; 
     --foreground: #ededed;
+    
+    --color-primary: #dc2626; 
+    --color-link: #f87171;
   }
 }
 
 body {
+  /* Dejamos esto simple, permitiendo que la clase bg-black en page.tsx tome el control */
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
