@@ -1,3 +1,5 @@
+// client/src/app/register/page.tsx - CON FONDO DEGRADADO APLICADO
+
 "use client";
 
 import { useState, FormEvent } from "react";
@@ -32,7 +34,7 @@ export default function RegisterPage() {
       return;
     }
 
-     if (password !== confirmPassword) {
+      if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       setLoading(false);
       return;
@@ -67,7 +69,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-black p-6 space-y-6">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-6 space-y-6">
 
       {/* CONTENEDOR DEL BOTÓN VOLVER AL INICIO */}
       <div className="w-full flex justify-center">
