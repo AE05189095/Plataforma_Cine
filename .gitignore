@@ -1,16 +1,16 @@
-# Dependencies
+
 /node_modules
 /client/node_modules
 /server/node_modules
 
-# Build files (Next.js)
+
 /client/.next
 /client/out
 
-# Environment variables (¡SECRETOS!)
+
 .env
 /client/.env.local
 /server/.env
 
-# Logs
+
 *.log
