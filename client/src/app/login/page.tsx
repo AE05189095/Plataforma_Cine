@@ -3,9 +3,10 @@
 "use client";
 
 import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function LoginPage() {
+  const pathname = usePathname();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
@@ -46,7 +47,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-black p-6 space-y-6">
+
+      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO */}
+      <div className="w-full flex justify-center">
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="flex items-center gap-2 px-4 py-2 text-white font-medium border-2 border-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors"
+        >
+          <span className="text-white text-lg">←</span>
+          Volver al inicio
+        </button>
+      </div>
+
+      {/* BOTONES DE LOGIN / REGISTER */}
+      <div className="w-full flex justify-center gap-4 mt-4">
+        <button
+          onClick={() => router.push("/login")}
+          className={`px-6 py-2 rounded-full font-medium transition-colors ${
+            pathname === "/login"
+              ? "bg-gray-700 text-white"
+              : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+          }`}
+        >
+          Iniciar sesión
+        </button>
+
+        <button
+          onClick={() => router.push("/register")}
+          className={`px-6 py-2 rounded-full font-medium transition-colors ${
+            pathname === "/register"
+              ? "bg-gray-700 text-white"
+              : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+          }`}
+        >
+          Registrarse
+        </button>
+      </div>
+
+       {/* CUADRO DEL FORMULARIO */}
       <div className="w-full max-w-md p-8 space-y-6 bg-gray-900 rounded-xl shadow-2xl border border-gray-700">
         
         {/* TÍTULO Y SUBTÍTULO */}
