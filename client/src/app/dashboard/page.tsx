@@ -1,8 +1,10 @@
+// client/src/app/dashboard/page.tsx - CON FONDO DEGRADADO APLICADO
+
 import InactivityLogout from "@/components/InactivityLogout";
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-white bg-black">
+    <div className="min-h-screen flex flex-col items-center justify-center text-white bg-gradient-to-b from-black via-gray-900 to-black">
       <InactivityLogout />
       <h1 className="text-4xl font-bold mb-4">Dashboard</h1>
       <p>¡Inicio de Sesión Exitoso! 🎉</p>
@@ -11,4 +13,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

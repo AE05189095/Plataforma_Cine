@@ -1,5 +1,3 @@
-// client/src/app/login/page.tsx - CON SUBTÍTULO AGREGADO
-
 "use client";
 
 import { useState, FormEvent } from 'react';
@@ -47,12 +45,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-black p-6 space-y-6">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-6 space-y-6">
 
-      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO */}
+      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO (¡CORRECCIÓN APLICADA AQUÍ!) */}
       <div className="w-full flex justify-center">
         <button
-          onClick={() => router.push("/dashboard")}
+          // CORRECCIÓN: Ahora apunta a la ruta raíz '/' (Home/Cartelera)
+          onClick={() => router.push("/")} 
           className="flex items-center gap-2 px-4 py-2 text-white font-medium border-2 border-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors"
         >
           <span className="text-white text-lg">←</span>
@@ -89,12 +88,10 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-8 space-y-6 bg-gray-900 rounded-xl shadow-2xl border border-gray-700">
         
         {/* TÍTULO Y SUBTÍTULO */}
-        {/* Usamos un div para agrupar el título y el subtítulo, y lo separamos del resto del contenido */}
         <div className="space-y-2">
             <h2 className="text-3xl font-bold text-center text-white">
                 Iniciar Sesión
             </h2>
-            {/* NUEVO TEXTO: Subtítulo de descripción */}
             <p className="text-center text-gray-400 text-sm">
                 Ingresa tus credenciales para acceder a tu cuenta
             </p>

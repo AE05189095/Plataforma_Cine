@@ -1,19 +1,20 @@
-const User = require("../models/User");
+const User = require("../models/User"); // De la rama CIN-2
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs"); // De la rama CIN-2
 const JWT_SECRET = process.env.JWT_SECRET || "clave_secreta";
 
-//Logica del controlador para registro de usuario 
+
 const registerController = async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    
     // Validar campos requeridos
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Todos los campos son obligatorios." });
     }
 
     //Verificar longitud de contraseña
-       if (password.length < 8) {
+    if (password.length < 8) {
       return res.status(400).json({ message: "La contraseña debe tener al menos 8 caracteres." });
     }
 
@@ -49,10 +50,12 @@ const registerController = async (req, res) => {
   }
 };
 
+
+// Logica del controlador para login de usuario (Mantenida de ambas ramas)
 const loginController = (req, res) => {
   const { email, password } = req.body;
 
-  // Simulación de usuario válido
+  // Lógica de validación temporal
   if (email === "test@example.com" && password === "123456") {
     const token = jwt.sign({ userId: "usuario123" }, JWT_SECRET, { expiresIn: "30m" });
     return res.json({ token });
@@ -60,5 +63,7 @@ const loginController = (req, res) => {
 
   res.status(401).json({ message: "Credenciales inválidas" });
 };
+
+
 
 module.exports = { loginController, registerController };

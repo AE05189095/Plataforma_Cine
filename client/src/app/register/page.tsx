@@ -1,3 +1,5 @@
+// client/src/app/register/page.tsx - CON REDIRECCIÓN CORREGIDA
+
 "use client";
 
 import { useState, FormEvent } from "react";
@@ -32,7 +34,7 @@ export default function RegisterPage() {
       return;
     }
 
-     if (password !== confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden.");
       setLoading(false);
       return;
@@ -68,12 +70,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-start min-h-screen bg-black p-6 space-y-6">
+    <div className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-6 space-y-6">
 
-      {/* CONTENEDOR DEL BOTÓN VOLVER AL INICIO */}
+      {/* CONTENEDOR DEL BOTÓN VOLVER AL INICIO (¡CORRECCIÓN APLICADA AQUÍ!) */}
       <div className="w-full flex justify-center">
         <button
-          onClick={() => router.push("/dashboard")}
+          // ANTES: onClick={() => router.push("/dashboard")}
+          // AHORA: Redirecciona a la ruta raíz '/' (el Home/Cartelera)
+          onClick={() => router.push("/")}
           className="flex items-center gap-2 px-4 py-2 text-white font-medium border-2 border-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors"
         >
           <span className="text-white text-lg">←</span>
