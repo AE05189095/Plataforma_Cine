@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const { loginController, registerController } = require("../controllers/authController"); // ¡Añadir registerController aquí!
+const { loginController, registerController } = require("../controllers/authController"); 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Ruta de Registro (¡Añadida manualmente!)
-router.post("/register", registerController); // <-- Línea de Registro
+router.post("/register", registerController); 
 
 // Ruta de login (Ya estaba)
 router.post("/login", loginController);
