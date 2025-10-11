@@ -1,5 +1,3 @@
-// client/src/app/login/page.tsx - CON FONDO DEGRADADO APLICADO
-
 "use client";
 
 import { useState, FormEvent } from 'react';
@@ -49,10 +47,11 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-6 space-y-6">
 
-      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO */}
+      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO (¡CORRECCIÓN APLICADA AQUÍ!) */}
       <div className="w-full flex justify-center">
         <button
-          onClick={() => router.push("/dashboard")}
+          // CORRECCIÓN: Ahora apunta a la ruta raíz '/' (Home/Cartelera)
+          onClick={() => router.push("/")} 
           className="flex items-center gap-2 px-4 py-2 text-white font-medium border-2 border-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors"
         >
           <span className="text-white text-lg">←</span>
