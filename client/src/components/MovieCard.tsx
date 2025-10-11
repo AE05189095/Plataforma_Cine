@@ -1,8 +1,20 @@
-// client/src/components/MovieCard.tsx - Versión FINAL con Degradado y sin Parpadeo
+// Ruta: client/src/components/MovieCard.tsx - Con Rutas Dinámicas
+
+"use client"; 
 
 import React, { useState } from 'react'; 
 import Image from 'next/image'; 
 import { useRouter } from 'next/navigation';
+
+// 🚨 FUNCIÓN PARA CREAR SLUG (Ruta amigable)
+const createSlug = (title: string): string => {
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // Remueve puntuación
+        .replace(/[\s_-]+/g, '-') // Reemplaza espacios y guiones bajos con guiones
+        .replace(/^-+|-+$/g, ''); // Remueve guiones al inicio/final
+};
 
 interface MovieCardProps {
     title: string;
@@ -17,20 +29,35 @@ interface MovieCardProps {
 export default function MovieCard({ title, image, rating, score, genre, duration, description }: MovieCardProps) {
     const router = useRouter();
     const [isHovered, setIsHovered] = useState(false); 
+    
+    // 🚨 GENERAMOS EL SLUG
+    const movieSlug = createSlug(title);
 
-    const handleMovieClick = () => {
-        console.log(`Clic en la tarjeta de: ${title}`);
+    // 🚨 La ruta dinámica ahora incluye el slug
+    const navigateToDetails = (e?: React.MouseEvent) => {
+        if (e) e.stopPropagation(); 
+        router.push(`/movies/${movieSlug}`); // <--- RUTA DINÁMICA CLAVE
     };
     
+    // Al hacer clic en la tarjeta (cualquier parte)
+    const handleMovieClick = () => {
+        navigateToDetails();
+    };
+    
+    // Al hacer clic en el botón "Ver detalles" (para detener la propagación)
     const handleDetailsClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); 
-        console.log(`Ver detalles de ${title}`);
+        navigateToDetails(e);
+    };
+
+    // Al hacer clic en el botón de funciones
+    const handleFuncionesClick = (e: React.MouseEvent) => {
+        navigateToDetails(e);
     };
 
     return (
         <div 
             className="cursor-pointer flex flex-col h-full"
-            onClick={handleMovieClick}
+            onClick={handleMovieClick} 
             onMouseEnter={() => setIsHovered(true)} 
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -61,7 +88,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                     `}
                 >
                     <button
-                        onClick={handleDetailsClick}
+                        onClick={handleDetailsClick} 
                         className="px-4 py-2 bg-orange-500 text-white font-bold rounded-lg shadow-lg hover:bg-orange-600 transition-colors text-sm"
                     >
                         Ver detalles
@@ -88,7 +115,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
             {/* Título */}
             <h3 className="text-xl font-bold mt-3 mb-1 truncate">{title}</h3>
             
-            {/* Metadata (Género y Duración) - Alineación a la derecha */}
+            {/* Metadata (Género y Duración) */}
             <div className="flex justify-between items-center text-sm text-gray-300"> 
                 {/* Género (Izquierda) */}
                 <span className="font-semibold text-red-500">{genre}</span>
@@ -105,8 +132,9 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                 {description}
             </p>
 
-            {/* Botón de Funciones - 💡 Degradado Rojo a Naranja (sin animación) */}
+            {/* Botón de Funciones - Degradado Rojo a Naranja */}
             <button 
+                onClick={handleFuncionesClick}
                 className={`
                     w-full mt-auto px-4 py-2 text-white font-bold text-base rounded-xl 
                     shadow-lg transition-all 

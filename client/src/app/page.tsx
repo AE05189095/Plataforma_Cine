@@ -1,13 +1,14 @@
-// client/src/app/page.tsx - Completo y Corregido
+// Ruta: client/src/app/page.tsx
 
 "use client";
 
 import React, { useState, useMemo, ChangeEvent } from 'react';
 import MovieCard from '@/components/MovieCard'; 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image'; 
 
 // ----------------------------------------------------------------
-// 1. DEFINICIÓN Y DATOS SIMULADOS (Añadimos duration y description)
+// 1. DEFINICIÓN Y DATOS SIMULADOS
 // ----------------------------------------------------------------
 interface MovieData {
     title: string;
@@ -16,13 +17,17 @@ interface MovieData {
     score: string;
     genre: string; 
     releaseDate: string; 
-    duration: string; // ✨ NUEVO: Duración de la película
-    description: string; // ✨ NUEVO: Breve descripción/sinopsis
+    duration: string; 
+    description: string; 
 }
 
 const ALL_GENRES = ["Todos los géneros", "Comedia", "Acción", "Drama", "Ciencia Ficción"];
 
 const MOVIES_CARTELERA: MovieData[] = [
+    { 
+        title: "Otro Viernes de Locos", image: "/images/otro-viernes-de-locos.jpg", rating: "PG-13", score: "7.8", genre: "Comedia", releaseDate: "2024-12-10",
+        duration: "110 min", description: "Años después de que Tess y Anna sufrieran una crisis de identidad, Anna ahora tiene una hija y una hijastra. Enfrentan los desafíos que se presentan cuando dos familias se fusionan. Tess y Anna descubren que un rayo puede caer dos veces."
+    },
     { 
         title: "Quantum Nexus", image: "/images/movie1.jpg", rating: "PG-13", score: "8.5", genre: "Ciencia Ficción", releaseDate: "2024-11-15",
         duration: "135 min", description: "Un físico viaja a través de dimensiones cuánticas para salvar el futuro de la humanidad."
@@ -57,7 +62,7 @@ export default function HomePage() {
     const [selectedDate, setSelectedDate] = useState<string>('');
 
     // ----------------------------------------------------------------
-    // 3. FUNCIÓN DE FILTRADO (Se mantiene igual)
+    // 2. LÓGICA DE FILTRADO (useMemo)
     // ----------------------------------------------------------------
     const filteredMovies = useMemo(() => {
         let currentMovies = MOVIES_CARTELERA;
@@ -76,7 +81,7 @@ export default function HomePage() {
             );
         }
 
-        // FILTRO 3: Fecha (Filtra solo las películas que tienen la fecha igual o posterior)
+        // FILTRO 3: Fecha
         if (selectedDate) {
              currentMovies = currentMovies.filter(movie =>
                 movie.releaseDate >= selectedDate
@@ -87,7 +92,7 @@ export default function HomePage() {
     }, [searchTerm, selectedGenre, selectedDate]);
 
     // ----------------------------------------------------------------
-    // 4. HANDLERS PARA CAPTURAR CAMBIOS (Se mantiene igual)
+    // 3. HANDLERS PARA CAPTURAR CAMBIOS
     // ----------------------------------------------------------------
     const handleSearchChange = (event: ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(event.target.value);
@@ -103,7 +108,7 @@ export default function HomePage() {
 
 
     // ----------------------------------------------------------------
-    // 5. RENDERIZADO 
+    // 4. RENDERIZADO 
     // ----------------------------------------------------------------
     return (
         <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
@@ -112,7 +117,16 @@ export default function HomePage() {
             <header className="bg-gray-900 text-white p-4 flex flex-col md:flex-row items-center justify-between gap-4">
                 
                 {/* Logo */}
-                <h1 className="text-2xl font-bold">Mi Cine</h1>
+                <div className="flex-shrink-0 bg-transparent">
+                    <Image 
+                        src="/images/Logo.png" 
+                        alt="Logo CineGT" 
+                        width={160}   
+                        height={60}   
+                        priority 
+                        className="bg-transparent" 
+                    />
+                </div>
 
                 {/* Buscador, filtros y fecha */}
                 <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-center w-full md:w-auto">
@@ -173,13 +187,13 @@ export default function HomePage() {
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {filteredMovies.length > 0 ? (
                         filteredMovies.map((movie, index) => (
+                            // Ya no se pasa 'onCardClick' aquí, MovieCard lo maneja internamente.
                             <MovieCard 
                                 key={index}
                                 title={movie.title}
                                 image={movie.image}
                                 rating={movie.rating}
                                 score={movie.score}
-                                // ✨ Pasando los nuevos datos
                                 genre={movie.genre} 
                                 duration={movie.duration} 
                                 description={movie.description}
