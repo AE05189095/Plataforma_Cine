@@ -56,19 +56,10 @@ export default function LoginPage({ userType }: LoginPageProps) {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-6 space-y-6">
-<<<<<<< HEAD
       {/* BOTÓN VOLVER AL INICIO */}
       <div className="w-full flex justify-center">
         <button
           onClick={() => router.push("/")}
-=======
-
-      {/* CONTENEDOR DEL BOTÓN VOLVER A INICIO (¡CORRECCIÓN APLICADA AQUÍ!) */}
-      <div className="w-full flex justify-center">
-        <button
-          // CORRECCIÓN: Ahora apunta a la ruta raíz '/' (Home/Cartelera)
-          onClick={() => router.push("/")} 
->>>>>>> CIN-33-Login-10102025
           className="flex items-center gap-2 px-4 py-2 text-white font-medium border-2 border-red-600 rounded-full hover:bg-red-600 hover:text-white transition-colors"
         >
           <span className="text-white text-lg">←</span>

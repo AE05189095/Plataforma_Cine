@@ -1,16 +1,9 @@
-<<<<<<< HEAD
-// Ruta: client/src/components/MovieCard.tsx - Con Rutas Dinámicas
-
 "use client"; 
-=======
-// client/src/components/MovieCard.tsx - Versión FINAL con Degradado y sin Parpadeo
->>>>>>> CIN-33-Login-10102025
 
 import React, { useState } from 'react'; 
 import Image from 'next/image'; 
 import { useRouter } from 'next/navigation';
 
-<<<<<<< HEAD
 // 🚨 FUNCIÓN PARA CREAR SLUG (Ruta amigable)
 const createSlug = (title: string): string => {
     return title
@@ -21,8 +14,6 @@ const createSlug = (title: string): string => {
         .replace(/^-+|-+$/g, ''); // Remueve guiones al inicio/final
 };
 
-=======
->>>>>>> CIN-33-Login-10102025
 interface MovieCardProps {
     title: string;
     image: string;
@@ -36,7 +27,6 @@ interface MovieCardProps {
 export default function MovieCard({ title, image, rating, score, genre, duration, description }: MovieCardProps) {
     const router = useRouter();
     const [isHovered, setIsHovered] = useState(false); 
-<<<<<<< HEAD
     
     // 🚨 GENERAMOS EL SLUG
     const movieSlug = createSlug(title);
@@ -60,26 +50,12 @@ export default function MovieCard({ title, image, rating, score, genre, duration
     // Al hacer clic en el botón de funciones
     const handleFuncionesClick = (e: React.MouseEvent) => {
         navigateToDetails(e);
-=======
-
-    const handleMovieClick = () => {
-        console.log(`Clic en la tarjeta de: ${title}`);
-    };
-    
-    const handleDetailsClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); 
-        console.log(`Ver detalles de ${title}`);
->>>>>>> CIN-33-Login-10102025
     };
 
     return (
         <div 
             className="cursor-pointer flex flex-col h-full"
-<<<<<<< HEAD
             onClick={handleMovieClick} 
-=======
-            onClick={handleMovieClick}
->>>>>>> CIN-33-Login-10102025
             onMouseEnter={() => setIsHovered(true)} 
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -110,11 +86,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                     `}
                 >
                     <button
-<<<<<<< HEAD
                         onClick={handleDetailsClick} 
-=======
-                        onClick={handleDetailsClick}
->>>>>>> CIN-33-Login-10102025
                         className="px-4 py-2 bg-orange-500 text-white font-bold rounded-lg shadow-lg hover:bg-orange-600 transition-colors text-sm"
                     >
                         Ver detalles
@@ -141,11 +113,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
             {/* Título */}
             <h3 className="text-xl font-bold mt-3 mb-1 truncate">{title}</h3>
             
-<<<<<<< HEAD
             {/* Metadata (Género y Duración) */}
-=======
-            {/* Metadata (Género y Duración) - Alineación a la derecha */}
->>>>>>> CIN-33-Login-10102025
             <div className="flex justify-between items-center text-sm text-gray-300"> 
                 {/* Género (Izquierda) */}
                 <span className="font-semibold text-red-500">{genre}</span>
@@ -162,14 +130,9 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                 {description}
             </p>
 
-<<<<<<< HEAD
             {/* Botón de Funciones - Degradado Rojo a Naranja */}
             <button 
                 onClick={handleFuncionesClick}
-=======
-            {/* Botón de Funciones - 💡 Degradado Rojo a Naranja (sin animación) */}
-            <button 
->>>>>>> CIN-33-Login-10102025
                 className={`
                     w-full mt-auto px-4 py-2 text-white font-bold text-base rounded-xl 
                     shadow-lg transition-all 
