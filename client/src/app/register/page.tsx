@@ -37,7 +37,8 @@ export default function RegisterPage() {
       setLoading(false);
       return;
     }
-
+    
+    //configuracion al backend 
     try {
       const response = await fetch("http://localhost:5000/api/auth/register", {
         method: "POST",
@@ -53,7 +54,7 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccess("Usuario registrado exitosamente. Redirigiendo al login...");
+      setSuccess("Usuario registrado exitosamente.");
       setLoading(false);
 
       // Espera un par de segundos antes de redirigir
