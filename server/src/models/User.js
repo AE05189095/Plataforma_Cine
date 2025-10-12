@@ -1,17 +1,17 @@
-// server/src/models/User.js - CORREGIDO con bcrypt en pre('save')
+// server/src/models/User.js
 
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
-    // Nombre de usuario tal como lo envía el frontend (campo "username")
+    // Nombre de usuario
     username: { type: String, required: true, trim: true },
     // Correo electrónico (único)
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    // Contraseña encriptada (no guardar texto plano)
+    // Contraseña encriptada
     password: { type: String, required: true },
-    // Tipo de usuario: por ahora 'cliente' por defecto, puede ser 'admin' en el futuro
+    // Tipo de usuario: 'cliente' por defecto
     tipoUsuario: { type: String, enum: ["cliente", "admin"], default: "cliente" },
   },
   {
@@ -19,27 +19,24 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// 🚨 MODIFICACIÓN CLAVE: Middleware para hashear la contraseña antes de guardar
+// 🔑 MIDDLEWARE (PRE-SAVE HOOK): Encriptar la contraseña antes de guardarla 🔑
 userSchema.pre("save", async function (next) {
-  // Solo hashear si la contraseña ha sido modificada (o es nueva)
-  if (!this.isModified("password")) {
-    return next();
-  }
-
-  try {
-    // Hashear la contraseña
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
+    // Solo hashea si la contraseña ha sido modificada (o es nueva)
+    if (!this.isModified("password")) {
+        return next();
+    }
+    try {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (err) {
+        next(err);
+    }
 });
 
-
 // Método para comparar contraseñas (útil en el login)
-userSchema.methods.comparePassword = function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Evitar devolver la contraseña en las respuestas JSON

@@ -1,25 +1,14 @@
-const express = require("express");
-const router = express.Router();
-const jwt = require("jsonwebtoken");
-const { loginController, registerController } = require("../controllers/authController"); 
-const { recoverPassword, verifyEmail } = require("../controllers/recoverController");
-const JWT_SECRET = process.env.JWT_SECRET;
+// server/src/routes/auth.routes.js (CORREGIDO)
 
-// Ruta de Registro (¡Añadida manualmente!)
-router.post("/register", registerController); 
+const express = require('express');
+const router = express.Router(); // ⬅️ 1. CREAMOS EL ROUTER
 
-// Ruta de login (Ya estaba)
-router.post("/login", loginController);
+// 2. Importamos las funciones de los controladores
+const { loginController, registerController } = require('../controllers/authController');
 
-// Ruta de recuperación de contraseña
-router.post("/recover-password", recoverPassword);
-// Ruta GET para verificar si el correo existe y dar alerta
-router.get("/recover-password", verifyEmail);
+// 3. ASIGNAMOS las funciones a las rutas
+router.post('/register', registerController);
+router.post('/login', loginController);
 
-const authMiddleware = require("./middleware/authMiddleware");
-
-router.get("/privado", authMiddleware, (req, res) => {
-  res.json({ message: "Acceso permitido", userId: req.userId });
-});
-
+// 4. 🚨 EXPORTAMOS EL OBJETO ROUTER 🚨 (Soluciona el TypeError)
 module.exports = router;
