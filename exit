@@ -1,0 +1,35 @@
+[33m888e12d[m[33m ([m[1;32mpresentation/final-demo[m[33m)[m Código limpio después de resolver conflictos
+[33m832c77c[m CIN-33: Fix final y validación de la estabilidad del login.
+[33m82545a2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mCIN-33-Login-10102025[m[33m, [m[1;31morigin/CIN-33-Login-10102025[m[33m)[m CIN-33: Implementación y estabilización final de la pantalla de login con soporte para roles (Colaborador/Admin).
+[33mf32107d[m[33m ([m[1;31morigin/presentation/final-demo[m[33m)[m CIN-33: Estabiliza la interfaz de login, corrige rutas y sube cambios locales finales.
+[33mf995ee1[m Merge pull request #14 from AE05189095/CIN-2-Register/10102025
+[33md81d6c0[m Merge branch 'presentation/final-demo' into CIN-2-Register/10102025
+[33m4bbdb7b[m Merge pull request #12 from AE05189095/CIN-22-autenticación-compra-101025
+[33m5de11e7[m CIN-22: Protección de ruta de compra con autenticación 10/10/25
+[33m1c6d68b[m Agrega backend register y modelo User
+[33m80009e9[m CIN-33: Implementación completa de rutas dinámicas de películas y solución de conflictos de slug.
+[33m5d24710[m[33m ([m[1;32mfeature/CIN-33[m[33m)[m feat: Integración de filtros, hover y degradado final de MovieCard
+[33maabe4ca[m[33m ([m[1;31morigin/feature/CIN-33[m[33m)[m WIP: Implementando lógica inicial para CIN-33
+[33m1dd9759[m[33m ([m[1;31morigin/master-estable101025[m[33m, [m[1;32mmaster-estable101025[m[33m)[m Merge branch 'presentation/final-demo' of https://github.com/AE05189095/Plataforma_Cine into presentation/final-demo
+[33md0c7fa0[m Fix: Guardando cambios locales de index.js antes del pull
+[33m7898b6d[m Merge pull request #7 from AE05189095/feature/HU5
+[33m58f1183[m Merge pull request #6 from AE05189095/CIN-16-feature-cierre-inactividad
+[33ma2d7cb4[m Merge branch 'presentation/final-demo' into CIN-16-feature-cierre-inactividad
+[33ma46050f[m Merge pull request #4 from AE05189095/CIN-2-feature/register
+[33mead804b[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #3 from AE05189095/feature/login
+[33m0a42849[m[33m ([m[1;31morigin/feature/login[m[33m)[m fix(backend): Final commit with all missing backend files
+[33m2d2942d[m Merge latest changes from main branch.
+[33m87b9572[m feat(backend): Setup Express Server and Mongoose Connection for R1
+[33me12ee38[m[33m ([m[1;31morigin/feature/HU5[m[33m)[m CIN-26: Implementación de HU25 - Filtrar películas
+[33m8de81d1[m Merge branch 'CIN-16-feature-cierre-inactividad' into feature/HU5
+[33ma15b456[m[33m ([m[1;31morigin/CIN-16-feature-cierre-inactividad[m[33m)[m Implementación de backend de cierre por inactividad con JWT
+[33me6b500a[m Corrigiendo tiempo de inactividad: de 5 a 30 minutos
+[33m35cfbc4[m Resolviendo conflicto en dashboard: fusionando login y cierre por inactividad
+[33m651f7aa[m[33m ([m[1;31morigin/CIN-2-feature/register[m[33m)[m Agregando register.tsx y botones a login.tsx
+[33mdaa229e[m CIN-16: Ajustar tiempo de cierre por inactividad a 30 minutos
+[33m8eea3ec[m CIN-16: Ajustar tiempo de cierre por inactividad a 30 minutos
+[33m1d09de3[m CIN-16: Añadido cierre de sesión por inactividad
+[33m9f35e05[m Merge pull request #1 from AE05189095/feature/login
+[33m07cf170[m feat: Implementación UI/UX completa de la página de inicio de sesión
+[33mfc8af86[m feat: Inicialización completa de Next.js (client) y Express (server)
+[33m058080f[m feat: Estructura inicial del proyecto, incluyendo .gitignore
