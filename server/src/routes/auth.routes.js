@@ -1,14 +1,23 @@
-// server/src/routes/auth.routes.js (CORREGIDO)
+
 
 const express = require('express');
-const router = express.Router(); // ⬅️ 1. CREAMOS EL ROUTER
+const router = express.Router(); 
 
-// 2. Importamos las funciones de los controladores
+
 const { loginController, registerController } = require('../controllers/authController');
 
-// 3. ASIGNAMOS las funciones a las rutas
+
+const { recoverPassword, verifyEmail } = require('../controllers/recoverController.js'); 
+
+
 router.post('/register', registerController);
 router.post('/login', loginController);
 
-// 4. 🚨 EXPORTAMOS EL OBJETO ROUTER 🚨 (Soluciona el TypeError)
+
+router.post('/recover-password', recoverPassword); 
+
+
+router.get('/recover-password', verifyEmail); 
+
+
 module.exports = router;
