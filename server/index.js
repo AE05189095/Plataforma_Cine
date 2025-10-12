@@ -35,6 +35,14 @@ app.use(express.json());
 
 // Todas las rutas de autenticación irán bajo /api/auth
 app.use('/api/auth', authRoutes);
+// Rutas de contenido
+const movieRoutes = require('./src/routes/movie.routes');
+const showtimeRoutes = require('./src/routes/showtime.routes');
+const purchaseRoutes = require('./src/routes/purchase.routes');
+
+app.use('/api/movies', movieRoutes);
+app.use('/api/showtimes', showtimeRoutes);
+app.use('/api/purchases', purchaseRoutes);
 // app.use('/api/users', userRoutes); // Descomentar si es necesario
 
 // Ruta de prueba
@@ -47,6 +55,15 @@ app.get('/', (req, res) => {
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
 // ==========================================================
 
+// Validar que la URI de MongoDB esté definida
+if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
+    console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
+    console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
+    console.error('    MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
+    process.exit(1);
+}
+
+// Conectar a MongoDB
 mongoose.connect(MONGODB_URI)
     .then(() => {
         console.log('✅ Conectado a MongoDB');
@@ -56,8 +73,6 @@ mongoose.connect(MONGODB_URI)
         });
     })
     .catch(err => {
-        
-        console.error('❌ ERROR al conectar a MongoDB:', err.message);
-        // Termina el proceso si la conexión a la DB falla
-        process.exit(1); 
+        console.error('❌ ERROR al conectar a MongoDB:', err.message || err);
+        process.exit(1);
     });
