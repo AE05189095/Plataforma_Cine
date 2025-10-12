@@ -5,7 +5,13 @@ export default function Header() {
   return (
     <header className="bg-gray-900 text-white p-4 flex flex-col md:flex-row items-center justify-between gap-4">
       {/* Logo */}
-      <h1 className="text-2xl font-bold">Mi Cine</h1>
+      <div className="flex items-center">
+        <img
+          src="/images/Logo.png"
+          alt="Logo CineGT"
+          style={{ width: 120, height: 'auto' }}
+        />
+      </div>
 
       {/* Buscador, filtros y fecha */}
       <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-center w-full md:w-auto">

@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 // Importación de rutas
-const authRoutes = require('./src/routes/auth.routes.js'); 
+const authRoutes = require('./src/routes/auth.routes.js');
 // const userRoutes = require('./src/routes/user.routes.js'); // Descomentar si es necesario
 
 const app = express();
@@ -34,7 +34,7 @@ app.use(express.json());
 // ==========================================================
 
 // Todas las rutas de autenticación irán bajo /api/auth
-app.use('/api/auth', authRoutes); 
+app.use('/api/auth', authRoutes);
 // app.use('/api/users', userRoutes); // Descomentar si es necesario
 
 // Ruta de prueba

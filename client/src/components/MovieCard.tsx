@@ -1,5 +1,3 @@
-// Ruta: client/src/components/MovieCard.tsx - Con Rutas Dinámicas
-
 "use client"; 
 
 import React, { useState } from 'react'; 
