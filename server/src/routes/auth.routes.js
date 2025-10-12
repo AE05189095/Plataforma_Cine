@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const { loginController, registerController } = require('../controllers/authControllerV2');
 const { recoverPassword, verifyEmail, resetPassword } = require('../controllers/recoverController');
@@ -22,7 +22,7 @@ router.post('/reset-password', resetPassword);
 const authMiddleware = require("./middleware/authMiddleware");
 
 router.get("/privado", authMiddleware, (req, res) => {
-  res.json({ message: "Acceso permitido", userId: req.userId });
+  res.json({ message: "Acceso permitido", userId: req.userId });
 });
 
 module.exports = router;
