@@ -1,39 +1,66 @@
+// server/src/controllers/authController.js (CORREGIDO)
+
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs"); 
+const User = require("../models/User"); // Asegúrate de que esta ruta sea correcta
 const JWT_SECRET = process.env.JWT_SECRET || "clave_secreta";
 
+// --- LOGIN CON BCYRPT Y MONGOOSE ---
+const loginController = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ message: "Credenciales inválidas" });
+        }
 
-const loginController = (req, res) => {
-  const { email, password } = req.body;
+        // 🔑 COMPARACIÓN CORRECTA con bcrypt
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: "Credenciales inválidas" });
+        }
 
-  
-  if (email === "test@example.com" && password === "123456") {
-    // 1. Generar el token (se incluye el rol 'cliente' en el payload)
-    const token = jwt.sign({ userId: "usuario123", tipoUsuario: "cliente" }, JWT_SECRET, { expiresIn: "30m" });
-    
-    // 2. Devolver el token y los datos del usuario (incluyendo el rol)
-    return res.json({ 
-      token,
-      message: "Inicio de sesión exitoso.",
-      user: {
-        id: "usuario123",
-        username: "Usuario de Prueba",
-        email: email,
-        tipoUsuario: "cliente" // 💡 Necesario para que el frontend sepa a dónde redirigir
-      } 
-    });
-  }
+        const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: "30m" });
+        
+        return res.json({ 
+            token,
+            message: "Inicio de sesión exitoso.",
+            user: { id: user._id, username: user.username, email: user.email, tipoUsuario: user.tipoUsuario || "cliente" } 
+        });
 
-  // Credenciales inválidas
-  res.status(401).json({ message: "Credenciales inválidas" });
+    } catch (error) {
+        console.error("Error durante el login:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
 };
 
+// --- REGISTRO CON BCYRPT Y MONGOOSE ---
+const registerController = async (req, res) => {
+    const { username, email, password } = req.body;
+    try {
+        let user = await User.findOne({ email });
+        if (user) {
+            return res.status(400).json({ message: "El correo ya está registrado." });
+        }
 
-const registerController = (req, res) => {
-  // Simulación de registro exitoso (sin guardar en DB)
-  res.status(201).json({ 
-    success: true,
-    message: "Registro exitoso. Ruta temporal de prueba." 
-  });
+        // 🔑 HASHING antes de guardar (Si User.js no lo hace automáticamente)
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        user = new User({ username, email, password: hashedPassword, tipoUsuario: "cliente" });
+
+        await user.save(); 
+
+        res.status(201).json({ 
+            success: true,
+            message: "Registro exitoso. Inicia sesión para continuar.",
+            user: { id: user._id, username: user.username, email: user.email, tipoUsuario: user.tipoUsuario }
+        });
+        
+    } catch (error) {
+        console.error("Error durante el registro:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
 };
 
 
