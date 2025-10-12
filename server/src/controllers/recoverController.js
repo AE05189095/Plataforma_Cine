@@ -1,19 +1,27 @@
-const User = require('../models/User');
+﻿const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
 exports.recoverPassword = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'El correo es requerido.' });
   try {
     const user = await User.findOne({ email });
+    // Mensaje genérico por seguridad: no confirmar existencia de cuentas en la respuesta
     if (!user) {
-      return res.status(404).json({ message: 'El correo no existe en la base de datos.' });
+      return res.status(200).json({ message: 'Si la cuenta existe, recibirás un correo de recuperación.' });
     }
-    // Aquí iría el envío real del correo de recuperación
-    // Generar token de recuperación (expira en 15 minutos). En producción enviar por email.
-    const jwt = require('jsonwebtoken');
+
+    // Generar token de recuperación (expira en 15 minutos). En producción se enviaría por email.
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'clave_secreta', { expiresIn: '15m' });
-    return res.status(200).json({ message: 'Token de recuperación generado (en entorno real se enviaría por email).', token });
+
+    // Aquí iría el envío real del correo de recuperación (placeholder)
+    const responseBody = { message: 'Correo de recuperación enviado! Revisa tu bandeja de entrada.' };
+    // Para entornos de desarrollo incluimos el token en la respuesta para facilitar pruebas
+    if (process.env.NODE_ENV !== 'production') { responseBody.token = token; }
+
+    return res.status(200).json(responseBody);
   } catch (err) {
+    console.error('recoverPassword error:', err);
     return res.status(500).json({ message: 'Error en el servidor.' });
   }
 };
@@ -29,6 +37,7 @@ exports.verifyEmail = async (req, res) => {
     }
     return res.status(200).json({ message: 'El correo existe. Puedes proceder con la recuperación.' });
   } catch (err) {
+    console.error('verifyEmail error:', err);
     return res.status(500).json({ message: 'Error en el servidor.' });
   }
 };
@@ -38,7 +47,6 @@ exports.resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword) return res.status(400).json({ message: 'Token y newPassword son requeridos.' });
   try {
-    const jwt = require('jsonwebtoken');
     const payload = jwt.verify(token, process.env.JWT_SECRET || 'clave_secreta');
     const user = await User.findById(payload.userId);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado.' });
@@ -47,6 +55,7 @@ exports.resetPassword = async (req, res) => {
     return res.status(200).json({ message: 'Contraseña actualizada correctamente.' });
   } catch (err) {
     if (err.name === 'TokenExpiredError') return res.status(400).json({ message: 'Token expirado.' });
+    console.error('resetPassword error:', err);
     return res.status(500).json({ message: 'Error en el servidor.' });
   }
 };
