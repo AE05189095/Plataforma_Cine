@@ -14,6 +14,9 @@ const authMiddleware = require('./middleware/authMiddleware');
 
 router.post('/register', registerController);
 router.post('/login', loginController);
+// Alias para compatibilidad con endpoints usados por el cliente
+router.post('/login-admin', loginController);
+router.post('/login-colaborador', loginController);
 
 
 router.post('/recover-password', recoverPassword); 
