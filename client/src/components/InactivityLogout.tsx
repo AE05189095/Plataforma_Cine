@@ -3,13 +3,14 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutos
+const INACTIVITY_LIMIT = 15 * 60 * 1000; // 30 minutos
 
 export default function InactivityLogout() {
   const router = useRouter();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const cerrarSesion = () => {
+    localStorage.removeItem("authToken");
     alert("Sesión cerrada por inactividad");
     router.push("/login");
   };
