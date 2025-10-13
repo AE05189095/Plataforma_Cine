@@ -22,5 +22,17 @@ router.post('/recover-password', recoverPassword);
 
 router.get('/recover-password', verifyEmail); 
 
+const authMiddleware = require('./middleware/authMiddleware');
+
+router.post('/comprar', authMiddleware, (req, res) => {
+  const { userId, tipoUsuario } = req.user;
+
+  res.json({
+    mensaje: 'Compra autorizada',
+    userId,
+    tipoUsuario
+  });
+});
+
 
 module.exports = router;
