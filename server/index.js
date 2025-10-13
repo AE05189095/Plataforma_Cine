@@ -1,4 +1,4 @@
-// server/index.js
+// server/index.js (CÓDIGO FINAL CORREGIDO)
 
 require('dotenv').config();
 
@@ -6,9 +6,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-// Importación de rutas
+// ==========================================================
+// 🔑 IMPORTACIÓN DE RUTAS (Una sola vez para cada ruta) 🔑
+// ==========================================================
 const authRoutes = require('./src/routes/auth.routes.js');
-const movieRoutes = require("./src/routes/movie.routes.js");
+const movieRoutes = require("./src/routes/movie.routes.js"); // <--- Mantenemos la primera importación
+const showtimeRoutes = require('./src/routes/showtime.routes'); // <--- Importaciones movidas aquí
+const purchaseRoutes = require('./src/routes/purchase.routes'); // <--- Importaciones movidas aquí
 // const userRoutes = require('./src/routes/user.routes.js'); // Descomentar si es necesario
 
 const app = express();
@@ -19,9 +23,9 @@ const MONGODB_URI = process.env.MONGODB_URI;
 // CONFIGURACIÓN DE MIDDLEWARES Y CORS
 // ==========================================================
 
-// Middleware CORS - Usamos el comodín '*' para evitar problemas en desarrollo
+// Middleware CORS
 app.use(cors({
-    origin: '*', // Permite peticiones desde cualquier lugar (localhost:3000, 3001, etc.)
+    origin: '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true
 }));
@@ -31,19 +35,14 @@ app.use(express.json());
 
 
 // ==========================================================
-// RUTAS DE LA API
-app.use('/api/auth', authRoutes);
-app.use('/api/movies', movieRoutes);
+// 🚀 RUTAS DE LA API (Consolidado) 🚀
 // ==========================================================
 
 // Todas las rutas de autenticación irán bajo /api/auth
 app.use('/api/auth', authRoutes);
-// Rutas de contenido
-const movieRoutes = require('./src/routes/movie.routes');
-const showtimeRoutes = require('./src/routes/showtime.routes');
-const purchaseRoutes = require('./src/routes/purchase.routes');
 
-app.use('/api/movies', movieRoutes);
+// Rutas de contenido (Películas, funciones, compras)
+app.use('/api/movies', movieRoutes); 
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
 // app.use('/api/users', userRoutes); // Descomentar si es necesario
@@ -62,7 +61,7 @@ app.get('/', (req, res) => {
 if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
     console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
     console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
-    console.error('    MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
+    console.error('    MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
     process.exit(1);
 }
 
