@@ -15,12 +15,17 @@ const loginController = async (req, res) => {
         }
 
         // 🔑 COMPARACIÓN CORRECTA con bcrypt
-        const isMatch = await bcrypt.compare(password, user.password);
+        //const isMatch = await bcrypt.compare(password, user.password);
+        console.log("Contraseña enviada:", password);
+        console.log("Contraseña guardada:", user.password);
+        const isMatch = await user.comparePassword(password);
+        console.log("¿Contraseña coincide?", isMatch);
+
         if (!isMatch) {
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
 
-        const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: "30m" });
+        const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: "15m" });
         
         return res.json({ 
             token,
