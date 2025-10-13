@@ -8,6 +8,7 @@ const cors = require('cors');
 
 // Importación de rutas
 const authRoutes = require('./src/routes/auth.routes.js');
+const movieRoutes = require("./src/routes/movie.routes.js");
 // const userRoutes = require('./src/routes/user.routes.js'); // Descomentar si es necesario
 
 const app = express();
@@ -31,6 +32,8 @@ app.use(express.json());
 
 // ==========================================================
 // RUTAS DE LA API
+app.use('/api/auth', authRoutes);
+app.use('/api/movies', movieRoutes);
 // ==========================================================
 
 // Todas las rutas de autenticación irán bajo /api/auth
