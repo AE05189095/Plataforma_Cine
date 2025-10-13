@@ -1,6 +1,6 @@
 "use client";
-import LoginPage from "../login/page";
+import EmployeeLoginForm from "@/components/EmployeeLoginForm";
 
 export default function LoginColaborador() {
-  return <LoginPage userType="colaborador" />;
+  return <EmployeeLoginForm userType="colaborador" />;
 }

@@ -2,30 +2,45 @@
 
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs"); 
-const User = require("../models/User"); // Asegúrate de que esta ruta sea correcta
+const User = require("../models/User");
+const Admin = require("../models/Admin");
+const Colab = require("../models/Colab");
 const JWT_SECRET = process.env.JWT_SECRET || "clave_secreta";
 
 // --- LOGIN CON BCYRPT Y MONGOOSE ---
 const loginController = async (req, res) => {
     const { email, password } = req.body;
     try {
-        const user = await User.findOne({ email });
+        // Buscar en User, Admin y Colab (en ese orden)
+        let user = await User.findOne({ email });
+        let source = 'User';
+        if (!user) {
+            user = await Admin.findOne({ email });
+            source = user ? 'Admin' : source;
+        }
+        if (!user) {
+            user = await Colab.findOne({ email });
+            source = user ? 'Colab' : source;
+        }
+
         if (!user) {
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
 
-        // 🔑 COMPARACIÓN CORRECTA con bcrypt
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Usar el método del modelo para comparar la contraseña
+        const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
 
-        const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: "30m" });
-        
-        return res.json({ 
+        const tipoUsuario = user.tipoUsuario || (source === 'Admin' ? 'admin' : (source === 'Colab' ? 'colaborador' : 'cliente'));
+
+        const token = jwt.sign({ userId: user._id, tipoUsuario }, JWT_SECRET, { expiresIn: "30m" });
+
+        return res.json({
             token,
             message: "Inicio de sesión exitoso.",
-            user: { id: user._id, username: user.username, email: user.email, tipoUsuario: user.tipoUsuario || "cliente" } 
+            user: { id: user._id, username: user.username, email: user.email, tipoUsuario }
         });
 
     } catch (error) {

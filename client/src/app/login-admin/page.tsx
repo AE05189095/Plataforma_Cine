@@ -1,11 +1,6 @@
 "use client";
-
-import LoginPage from "../login/page"; 
-
-
+import EmployeeLoginForm from "@/components/EmployeeLoginForm";
 
 export default function LoginAdmin() {
-
-  return <LoginPage userType="admin" />;
-
+  return <EmployeeLoginForm userType="admin" />;
 }
