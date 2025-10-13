@@ -1,5 +1,3 @@
-// server/src/controllers/authController.js (CORREGIDO)
-
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs"); 
 const User = require("../models/User");
@@ -29,6 +27,7 @@ const loginController = async (req, res) => {
 
         // Usar el método del modelo para comparar la contraseña
         const isMatch = await user.comparePassword(password);
+
         if (!isMatch) {
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
@@ -77,6 +76,5 @@ const registerController = async (req, res) => {
         res.status(500).json({ message: "Error interno del servidor." });
     }
 };
-
 
 module.exports = { loginController, registerController };
