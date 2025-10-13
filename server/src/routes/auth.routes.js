@@ -12,6 +12,9 @@ const { recoverPassword, verifyEmail } = require('../controllers/recoverControll
 
 router.post('/register', registerController);
 router.post('/login', loginController);
+// Alias para compatibilidad con endpoints usados por el cliente
+router.post('/login-admin', loginController);
+router.post('/login-colaborador', loginController);
 
 
 router.post('/recover-password', recoverPassword); 
