@@ -6,7 +6,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("token"); // JWT guardado al hacer login
+    const token = localStorage.getItem("authToken"); // JWT guardado al hacer login
     if (!token) {
       router.push("/login"); // si no hay token, redirige
     }
