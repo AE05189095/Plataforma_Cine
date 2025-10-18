@@ -1,17 +1,26 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
+// --- Middlewares ---
 app.use(cors());
 app.use(express.json());
 
-// --- Importar rutas (ajustado al nombre real de tus archivos) ---
-const authRoutes = require("./src/routes/auth.routes"); // ✅ nombre correcto
+// ✅ Servir imágenes desde client/public/images
+app.use(
+  "/images",
+  express.static(
+    path.join(__dirname, "../client/public/images")
+  )
+);
+
+// --- Importar rutas ---
+const authRoutes = require("./src/routes/auth.routes");
 const movieRoutes = require("./src/routes/movie.routes");
 const showtimeRoutes = require("./src/routes/showtime.routes");
 const purchaseRoutes = require("./src/routes/purchase.routes");
@@ -24,7 +33,7 @@ app.use("/api/showtimes", showtimeRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/halls", hallRoutes);
 
-// --- Conexión a MongoDB Atlas ---
+// --- Conexión a MongoDB ---
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => {

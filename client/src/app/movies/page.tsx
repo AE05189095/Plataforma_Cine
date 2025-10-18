@@ -44,7 +44,7 @@ export default function MoviesPage() {
         setMovies(data);
         setFilteredMovies(data);
       } catch (err) {
-        console.error(err);
+        console.error("❌ Error al obtener películas:", err);
       }
     };
     fetchMovies();
@@ -66,8 +66,8 @@ export default function MoviesPage() {
     }
     if (dateFilter) {
       filtered = filtered.filter((m) =>
-        m.showtimes.some((s) =>
-          new Date(s.date).toLocaleDateString("en-CA") === dateFilter
+        m.showtimes.some(
+          (s) => new Date(s.date).toLocaleDateString("en-CA") === dateFilter
         )
       );
     }
@@ -154,65 +154,83 @@ export default function MoviesPage() {
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {filteredMovies.map((movie) => (
-              <div
-                key={movie._id}
-                className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 hover:scale-[1.02] transition-all"
-              >
-                <img
-                  src={movie.image}
-                  alt={movie.title}
-                  className="w-full h-80 object-cover border-b border-gray-700"
-                />
-                <div className="p-5 flex flex-col justify-between h-[300px]">
-                  <div>
-                    <h2 className="text-2xl font-bold text-orange-400 mb-2">
-                      {movie.title}
-                    </h2>
-                    <div className="flex flex-wrap gap-2 text-sm text-gray-300 mb-2">
-                      <span className="bg-gray-700 px-2 py-1 rounded">
-                        {movie.genre}
-                      </span>
-                      <span className="bg-red-700 px-2 py-1 rounded">
-                        {movie.rating}
-                      </span>
-                      <span className="bg-yellow-600 px-2 py-1 rounded">
-                        ⭐ {movie.score}
-                      </span>
-                    </div>
-                    <p className="text-gray-400 text-sm line-clamp-3">
-                      {movie.description}
-                    </p>
-                  </div>
+            {filteredMovies.map((movie) => {
+              // 🧩 Validar y ajustar ruta de imagen
+              let imageSrc = movie.image || "";
 
-                  <div className="mt-4">
-                    <button
-                      onClick={() => {
-                        if (movie.showtimes && movie.showtimes.length > 0) {
-                          const firstShow = movie.showtimes[0];
-                          router.push(
-                            `/showtimes/${firstShow._id}?title=${encodeURIComponent(
-                              movie.title
-                            )}&time=${encodeURIComponent(
-                              firstShow.time
-                            )}&date=${encodeURIComponent(
-                              firstShow.date
-                            )}&sala=${encodeURIComponent(
-                              firstShow.sala
-                            )}&price=${firstShow.price}`
-                          );
-                        } else {
-                          alert("No hay horarios disponibles para esta película.");
-                        }
-                      }}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold transition-colors"
-                    >
-                      🎟️ Ver horarios / Comprar boletos
-                    </button>
+              // Si el backend ya devuelve URL completa, se usa tal cual
+              // Si devuelve nombre o ruta relativa, la corregimos
+              if (!imageSrc) {
+                imageSrc = "/images/default-poster.jpg"; // fallback
+              } else if (!imageSrc.startsWith("http")) {
+                imageSrc = `/images/${imageSrc.replace(/^\/?images\//, "")}`;
+              }
+
+              return (
+                <div
+                  key={movie._id}
+                  className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 hover:scale-[1.02] transition-all"
+                >
+                  <img
+                    src={imageSrc}
+                    alt={movie.title}
+                    className="w-full h-80 object-cover border-b border-gray-700"
+                    onError={(e) =>
+                      (e.currentTarget.src = "/images/default-poster.jpg")
+                    }
+                  />
+                  <div className="p-5 flex flex-col justify-between h-[300px]">
+                    <div>
+                      <h2 className="text-2xl font-bold text-orange-400 mb-2">
+                        {movie.title}
+                      </h2>
+                      <div className="flex flex-wrap gap-2 text-sm text-gray-300 mb-2">
+                        <span className="bg-gray-700 px-2 py-1 rounded">
+                          {movie.genre}
+                        </span>
+                        <span className="bg-red-700 px-2 py-1 rounded">
+                          {movie.rating}
+                        </span>
+                        <span className="bg-yellow-600 px-2 py-1 rounded">
+                          ⭐ {movie.score}
+                        </span>
+                      </div>
+                      <p className="text-gray-400 text-sm line-clamp-3">
+                        {movie.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-4">
+                      <button
+                        onClick={() => {
+                          if (movie.showtimes && movie.showtimes.length > 0) {
+                            const firstShow = movie.showtimes[0];
+                            router.push(
+                              `/showtimes/${firstShow._id}?title=${encodeURIComponent(
+                                movie.title
+                              )}&time=${encodeURIComponent(
+                                firstShow.time
+                              )}&date=${encodeURIComponent(
+                                firstShow.date
+                              )}&sala=${encodeURIComponent(
+                                firstShow.sala
+                              )}&price=${firstShow.price}`
+                            );
+                          } else {
+                            alert(
+                              "No hay horarios disponibles para esta película."
+                            );
+                          }
+                        }}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold transition-colors"
+                      >
+                        🎟️ Ver horarios / Comprar boletos
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
