@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 
 const purchaseSchema = new mongoose.Schema({
   showtime: { type: mongoose.Schema.Types.ObjectId, ref: "Showtime", required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },//agregado userId
   seats: [{ type: String, required: true }],
   movieTitle: { type: String },
   hallName: { type: String },
