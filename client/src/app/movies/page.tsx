@@ -116,6 +116,7 @@ export default function MoviesPage() {
             <option value="Comedia">Comedia</option>
             <option value="Terror">Terror</option>
             <option value="Aventura">Aventura</option>
+            <option value="Ciencia Ficción">Ciencia Ficción</option>
           </select>
           <input
             type="date"
@@ -157,11 +158,8 @@ export default function MoviesPage() {
             {filteredMovies.map((movie) => {
               // 🧩 Validar y ajustar ruta de imagen
               let imageSrc = movie.image || "";
-
-              // Si el backend ya devuelve URL completa, se usa tal cual
-              // Si devuelve nombre o ruta relativa, la corregimos
               if (!imageSrc) {
-                imageSrc = "/images/default-poster.jpg"; // fallback
+                imageSrc = "/images/default-poster.jpg";
               } else if (!imageSrc.startsWith("http")) {
                 imageSrc = `/images/${imageSrc.replace(/^\/?images\//, "")}`;
               }
@@ -169,7 +167,8 @@ export default function MoviesPage() {
               return (
                 <div
                   key={movie._id}
-                  className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 hover:scale-[1.02] transition-all"
+                  onClick={() => router.push(`/movies/${movie._id}`)}
+                  className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 hover:scale-[1.02] transition-all cursor-pointer"
                 >
                   <img
                     src={imageSrc}
@@ -202,29 +201,13 @@ export default function MoviesPage() {
 
                     <div className="mt-4">
                       <button
-                        onClick={() => {
-                          if (movie.showtimes && movie.showtimes.length > 0) {
-                            const firstShow = movie.showtimes[0];
-                            router.push(
-                              `/showtimes/${firstShow._id}?title=${encodeURIComponent(
-                                movie.title
-                              )}&time=${encodeURIComponent(
-                                firstShow.time
-                              )}&date=${encodeURIComponent(
-                                firstShow.date
-                              )}&sala=${encodeURIComponent(
-                                firstShow.sala
-                              )}&price=${firstShow.price}`
-                            );
-                          } else {
-                            alert(
-                              "No hay horarios disponibles para esta película."
-                            );
-                          }
+                        onClick={(e) => {
+                          e.stopPropagation(); // Evita que el click del contenedor se duplique
+                          router.push(`/movies/${movie._id}`);
                         }}
                         className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold transition-colors"
                       >
-                        🎟️ Ver horarios / Comprar boletos
+                        🎟️ Ver detalles
                       </button>
                     </div>
                   </div>

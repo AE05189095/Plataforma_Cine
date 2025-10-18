@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { API_URL } from "@/services/api"; // ✅ asegúrate de tenerlo configurado como http://localhost:5000/api
 
 interface MovieCardProps {
   _id: string;
@@ -29,12 +30,17 @@ export default function MovieCard({
 }: MovieCardProps) {
   const router = useRouter();
   const [isHovered, setIsHovered] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
-  // Imagen por defecto si no hay
+  // ✅ Verificar si la imagen es una ruta relativa
   const validImage =
-    image && image.trim() !== "" ? image : "/images/no-image.jpg";
+    hasError || !image
+      ? "/images/no-image.jpg"
+      : image.startsWith("http") || image.startsWith("/")
+      ? image
+      : `${API_URL.replace("/api", "")}${image}`;
 
-  // Ir al detalle de película
+  // 👉 Ir al detalle de película
   const navigateToDetails = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     router.push(`/movies/${_id}`);
@@ -47,13 +53,11 @@ export default function MovieCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Contenedor de imagen */}
+      {/* 🎬 Contenedor de imagen */}
       <div
-        className={`
-          aspect-[3/4] bg-gray-800 rounded-lg overflow-hidden shadow-xl 
+        className={`aspect-[3/4] bg-gray-800 rounded-lg overflow-hidden shadow-xl 
           transform transition-all duration-300 relative border-2 flex-shrink-0
-          ${isHovered ? "border-orange-500 scale-[1.03]" : "border-gray-700"}
-        `}
+          ${isHovered ? "border-orange-500 scale-[1.03]" : "border-gray-700"}`}
       >
         <Image
           src={validImage}
@@ -62,15 +66,14 @@ export default function MovieCard({
           sizes="(max-width: 768px) 50vw, 25vw"
           style={{ objectFit: "cover" }}
           className="transition-all duration-300"
+          onError={() => setHasError(true)} // ✅ fallback si no carga
         />
 
-        {/* Overlay al hacer hover */}
+        {/* 🔸 Overlay “Ver detalles” */}
         <div
-          className={`
-            absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center 
+          className={`absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center 
             transition-opacity duration-300
-            ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}
-          `}
+            ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
           <button
             onClick={navigateToDetails}
@@ -80,7 +83,7 @@ export default function MovieCard({
           </button>
         </div>
 
-        {/* Etiquetas */}
+        {/* 🔖 Rating */}
         <div className="absolute top-2 left-2 flex flex-col space-y-1">
           <span
             className={`px-2 py-0.5 text-xs font-bold rounded ${
@@ -91,6 +94,7 @@ export default function MovieCard({
           </span>
         </div>
 
+        {/* ⭐ Puntuación */}
         <div className="absolute top-2 right-2 flex items-center space-x-1 bg-gray-900/70 backdrop-blur-sm px-2 py-1 rounded">
           <svg
             className="w-3 h-3 text-yellow-400"
@@ -103,7 +107,7 @@ export default function MovieCard({
         </div>
       </div>
 
-      {/* Información general */}
+      {/* 🎞️ Información */}
       <h3 className="text-xl font-bold mt-3 mb-1 truncate">{title}</h3>
 
       <div className="flex justify-between items-center text-sm text-gray-300">
@@ -116,35 +120,28 @@ export default function MovieCard({
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
           >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth="2"
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            ></path>
+            />
           </svg>
           <span>{duration || "N/A"}</span>
         </div>
       </div>
 
-      <p
-        className="text-sm text-gray-400 mt-2 line-clamp-2"
-        title={description}
-      >
+      <p className="text-sm text-gray-400 mt-2 line-clamp-2" title={description}>
         {description || "Sin descripción disponible."}
       </p>
 
-      {/* Botón de funciones */}
+      {/* 🎟️ Botón inferior */}
       <button
         onClick={navigateToDetails}
-        className={`
-          w-full mt-auto px-4 py-2 text-white font-bold text-base rounded-xl 
-          shadow-lg transition-all 
-          bg-gradient-to-r from-red-600 to-orange-500 
-          hover:from-red-700 hover:to-orange-600
-        `}
+        className="w-full mt-auto px-4 py-2 text-white font-bold text-base rounded-xl 
+          shadow-lg transition-all bg-gradient-to-r from-red-600 to-orange-500 
+          hover:from-red-700 hover:to-orange-600"
       >
         {showtimes.length > 0
           ? `${showtimes.length} ${
