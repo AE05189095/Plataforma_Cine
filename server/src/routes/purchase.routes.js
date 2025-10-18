@@ -1,8 +1,13 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/purchaseController');
+const controller = require("../controllers/purchaseController");
+const authMiddleware = require("./middleware/authMiddleware");
 
-router.post('/', controller.create);
-router.get('/user/:userId', controller.listByUser);
+// 🔒 Crear una compra (requiere autenticación)
+router.post("/", authMiddleware, controller.create);
 
-module.exports = router;
+// 📜 Obtener compras del usuario autenticado
+router.get("/me", authMiddleware, controller.listByUser);
+
+// 📜 Obtener todas las compras (admin/debug)
+router.get("/", controller.list);

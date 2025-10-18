@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const hallSchema = new mongoose.Schema(
   {
@@ -7,8 +7,9 @@ const hallSchema = new mongoose.Schema(
     layout: { type: Object }, // opcionalmente describir filas/columnas
     location: { type: String },
     isActive: { type: Boolean, default: true },
+    description: { type: String },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Hall', hallSchema);
+module.exports = mongoose.model("Hall", hallSchema);

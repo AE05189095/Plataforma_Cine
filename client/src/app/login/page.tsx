@@ -1,54 +1,68 @@
 "use client";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { API_URL } from "@/services/api";
 
-import { useState, FormEvent } from "react";
-import { useRouter, usePathname } from "next/navigation";
+  import { useEffect } from "react";
 
-interface LoginPageProps {
-  userType?: "colaborador" | "admin";
-}
-
-export default function LoginPage({ userType }: LoginPageProps) {
-  const pathname = usePathname();
+export default function LoginPage() {
+  const router = useRouter();
+  const [userType, setUserType] = useState<"admin" | "colaborador" | "cliente">("cliente");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e: FormEvent) => {
+
+useEffect(() => {
+  const pathname = usePathname();
+  if (pathname.includes("login-admin")) setUserType("admin");
+  else if (pathname.includes("login-colaborador")) setUserType("colaborador");
+  else setUserType("cliente");
+}, []);
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      // 🔸 Endpoint dinámico según el tipo de usuario
-      let endpoint = "http://localhost:5000/api/auth/login";
-      if (userType === "colaborador") endpoint = "http://localhost:5000/api/auth/login-colaborador";
-      if (userType === "admin") endpoint = "http://localhost:5000/api/auth/login-admin";
+let endpoint = `${API_URL}/auth/login`;
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
 
-      const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.message || "Credenciales incorrectas. Por favor, revisa tu email y contraseña.");
-        setLoading(false);
-        return;
-      }
 
-      localStorage.setItem("authToken", data.token);
+try {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
 
-      // 🔸 Redirección según tipo
-      if (userType === "admin") router.push("/admin-dashboard");
-      else if (userType === "colaborador") router.push("/dashboard-colaborador");
-      else router.push("/dashboard");
+  const data = await res.json();
 
-    } catch (err) {
-      setError("Error de conexión. Asegúrate de que el servidor Express esté encendido (Puerto 5000).");
+  if (!res.ok) throw new Error(data.message || "Credenciales incorrectas. Por favor, revisa tu email y contraseña.");
+
+  localStorage.setItem("authToken", data.token);
+  localStorage.setItem("userData", JSON.stringify(data.user));
+
+  const tipo = data.user.tipoUsuario || data.user.role || "cliente";
+
+  if (tipo === "admin") {
+    router.push("/admin-dashboard");
+  } else if (tipo === "colaborador") {
+    router.push("/dashboard-colaborador");
+  } else {
+    router.push("/dashboard");
+  }
+} catch (err: any) {
+  console.error("Error:", err);
+  setError(err.message || "Error de conexión. Asegúrate de que el servidor Express esté encendido.");
+  setLoading(false);
+}
+
     } finally {
       setLoading(false);
     }

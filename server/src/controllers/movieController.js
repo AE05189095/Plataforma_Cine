@@ -1,56 +1,100 @@
-const Movie = require('../models/Movie');
+const mongoose = require("mongoose");
+const Movie = require("../models/Movie");
+const Showtime = require("../models/Showtime");
 
+// 📍 Listar todas las películas con funciones
 exports.list = async (req, res) => {
   try {
-    const movies = await Movie.find({ isActive: true }).sort({ createdAt: -1 }).lean();
+    const movies = await Movie.find()
+      .populate({
+        path: "showtimes",
+        model: "Showtime",
+        populate: { path: "hall", select: "name" },
+      })
+      .lean();
+
     res.json(movies);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.error("❌ Error al listar películas:", error);
+    res.status(500).json({ message: "Error al obtener películas." });
   }
 };
 
-exports.getBySlug = async (req, res) => {
+// 🎬 Obtener una película específica por ID o slug
+exports.getById = async (req, res) => {
   try {
-    const { slug } = req.params;
-    const movie = await Movie.findOne({ slug }).lean();
-    if (!movie) return res.status(404).json({ message: 'Película no encontrada' });
+    const movieIdOrSlug = req.params.id;
+    const movie = await Movie.findOne({
+      $or: [
+        { _id: new mongoose.Types.ObjectId(movieIdOrSlug) },
+        { slug: movieIdOrSlug },
+      ],
+    })
+      .populate({
+        path: "showtimes",
+        model: "Showtime",
+        populate: { path: "hall", select: "name" },
+      })
+      .lean();
+
+    if (!movie) {
+      return res.status(404).json({ message: "Película no encontrada." });
+    }
+
     res.json(movie);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.error("❌ Error al obtener película:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
   }
 };
 
+// ➕ Crear una película
 exports.create = async (req, res) => {
   try {
     const payload = req.body;
-    // Slug generation si falta
+
+    // 🧠 Generar slug si no viene incluido
     if (!payload.slug && payload.title) {
-      payload.slug = payload.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      payload.slug = payload.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
     }
-    const movie = await Movie.create(payload);
+
+    const movie = new Movie(payload);
+    await movie.save();
     res.status(201).json(movie);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+  } catch (error) {
+    console.error("❌ Error al crear película:", error);
+    res.status(500).json({ message: "Error al crear película." });
   }
 };
 
+
+
+// ✏️ Actualizar película
 exports.update = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updated = await Movie.findByIdAndUpdate(id, req.body, { new: true });
-    if (!updated) return res.status(404).json({ message: 'Película no encontrada' });
-    res.json(updated);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
+    const movie = await Movie.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
+    if (!movie) return res.status(404).json({ message: "Película no encontrada." });
+    res.json(movie);
+  } catch (error) {
+    console.error("❌ Error al actualizar película:", error);
+    res.status(500).json({ message: "Error al actualizar película." });
   }
 };
 
+// ❌ Eliminar película
 exports.remove = async (req, res) => {
   try {
-    const { id } = req.params;
-    await Movie.findByIdAndDelete(id);
-    res.status(204).end();
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const movie = await Movie.findByIdAndDelete(req.params.id);
+    if (!movie)
+      return res.status(404).json({ message: "Película no encontrada." });
+    res.json({ message: "Película eliminada correctamente." });
+  } catch (error) {
+    console.error("❌ Error al eliminar película:", error);
+    res.status(500).json({ message: "Error al eliminar película." });
   }
 };

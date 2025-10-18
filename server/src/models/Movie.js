@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const movieSchema = new mongoose.Schema(
   {
@@ -10,16 +10,28 @@ const movieSchema = new mongoose.Schema(
     director: { type: String },
     cast: [{ type: String }],
     releaseDate: { type: Date },
-    rating: { type: Number, min: 0, max: 10, default: 0 },
-    ratingCount: { type: Number, default: 0 },
+    rating: { type: Number, min: 0, max: 10, default: 0 }, // promedio
+    ratingCount: { type: Number, default: 0 }, // cantidad de votos
+    score: { type: Number }, // puntuación interna
     posterUrl: { type: String },
     images: [{ type: String }],
     language: { type: String },
     subtitles: [{ type: String }],
     isActive: { type: Boolean, default: true },
     isFeatured: { type: Boolean, default: false },
+
+    // 🔗 Relación con funciones (Showtimes)
+    showtimes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Showtime",
+      },
+    ],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-module.exports = mongoose.model('Movie', movieSchema);
+
+module.exports = mongoose.model("Movie", movieSchema);

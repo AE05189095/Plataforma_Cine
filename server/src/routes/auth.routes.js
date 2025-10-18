@@ -1,36 +1,48 @@
-// server/src/routes/auth.routes.js (VERSIÓN FINAL RESUELTA)
+const express = require("express");
+const router = express.Router();
+const jwt = require("jsonwebtoken");
+const { loginController, registerController } = require("../controllers/authController");
+const { recoverPassword, verifyEmail } = require("../controllers/recoverController");
+const authMiddleware = require("./middleware/authMiddleware");
+const Colab = require("../models/Colab");
 
-const express = require('express');
-const router = express.Router(); 
+const JWT_SECRET = process.env.JWT_SECRET || "clave_secreta";
 
-// --- Importaciones de Controladores (Estructura Modular) ---
-const { loginController, registerController } = require('../controllers/authController');
-const { recoverPassword, verifyEmail } = require('../controllers/recoverController.js'); 
-const authMiddleware = require('./middleware/authMiddleware'); // <--- SÓLO UNA DECLARACIÓN
+// --- Rutas de Autenticación ---
+router.post("/register", registerController);
+router.post("/login", loginController);
 
-// --- Rutas de Autenticación y Login ---
-router.post('/register', registerController);
-router.post('/login', loginController);
-// Alias para compatibilidad (Se mantienen desde presentation/final-demo)
-router.post('/login-admin', loginController);
-router.post('/login-colaborador', loginController);
+// --- Rutas de compatibilidad heredadas ---
+router.post("/login-admin", loginController);
+router.post("/login-colaborador", loginController);
 
-// --- Rutas de Recuperación (Se mantienen desde presentation/final-demo) ---
-router.post('/recover-password', recoverPassword); 
-router.get('/recover-password', verifyEmail); 
+// --- Rutas de recuperación ---
+router.post("/recover-password", recoverPassword);
+router.get("/recover-password", verifyEmail);
 
-// --- Rutas Protegidas ---
+// --- Verificación de token (admin panel, compatibilidad) ---
+router.get("/verify", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
 
-// Mantenemos la ruta /protegida original de presentation/final-demo
-router.get('/protegida', authMiddleware, (req, res) => {
-    res.json({
-        mensaje: 'Acceso autorizado',
-        userId: req.userId.userId,
-        tipoUsuario: req.userId.tipoUsuario
-    });
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return res.json(decoded);
+  } catch (err) {
+    return res.status(401).json({ message: "Token inválido o expirado" });
+  }
 });
 
-// Nota: La ruta /comprar no fue incluida porque causaba inconsistencia en el uso de req.user/req.userId.
-// La versión estable de /protegida fue la elegida.
+// --- Ruta protegida para pruebas ---
+router.get("/protegida", authMiddleware, (req, res) => {
+  res.json({
+    mensaje: "Acceso autorizado",
+    userId: req.userId.userId,
+    tipoUsuario: req.userId.tipoUsuario,
+  });
+});
 
 module.exports = router;
