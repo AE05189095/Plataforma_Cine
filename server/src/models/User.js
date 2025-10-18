@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema(
     // Contraseña encriptada
     password: { type: String, required: true },
     // Tipo de usuario: 'cliente' por defecto
-    tipoUsuario: { type: String, enum: ["cliente", "admin"], default: "cliente" },
+    role: { type: String, enum: ["cliente","colaborador", "admin"], default: "cliente" },
   },
   {
     timestamps: true, // createdAt, updatedAt

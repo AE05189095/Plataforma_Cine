@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+/*const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const Colab = require('../models/Colab');
@@ -15,7 +15,7 @@ const loginController = async (req, res) => {
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Credenciales inválidas' });
 
-    const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: '30m' });
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '30m' });
 
     return res.json({ token, user: user.toJSON() });
   } catch (err) {
@@ -25,14 +25,14 @@ const loginController = async (req, res) => {
 
 // Registro: crea un usuario en la DB
 const registerController = async (req, res) => {
-  const { username, email, password, tipoUsuario } = req.body;
+  const { username, email, password, role } = req.body;
   if (!username || !email || !password) return res.status(400).json({ message: 'username, email y password son requeridos' });
   try {
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'El correo ya está registrado' });
 
-    const user = await User.create({ username, email, password, tipoUsuario });
-    const token = jwt.sign({ userId: user._id, tipoUsuario: user.tipoUsuario }, JWT_SECRET, { expiresIn: '30m' });
+    const user = await User.create({ username, email, password, role });
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '30m' });
     return res.status(201).json({ token, user: user.toJSON() });
   } catch (err) {
     return res.status(500).json({ message: 'Error en el servidor' });
@@ -48,7 +48,7 @@ const loginAdmin = async (req, res) => {
     if (!admin) return res.status(401).json({ message: 'Credenciales inválidas' });
     const match = await admin.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Credenciales inválidas' });
-    const token = jwt.sign({ userId: admin._id, tipoUsuario: 'admin' }, JWT_SECRET, { expiresIn: '30m' });
+    const token = jwt.sign({ userId: admin._id, role: 'admin' }, JWT_SECRET, { expiresIn: '30m' });
     return res.json({ token, user: admin.toJSON() });
   } catch (err) {
     return res.status(500).json({ message: 'Error en el servidor' });
@@ -64,7 +64,7 @@ const loginColab = async (req, res) => {
     if (!colab) return res.status(401).json({ message: 'Credenciales inválidas' });
     const match = await colab.comparePassword(password);
     if (!match) return res.status(401).json({ message: 'Credenciales inválidas' });
-    const token = jwt.sign({ userId: colab._id, tipoUsuario: 'colaborador' }, JWT_SECRET, { expiresIn: '30m' });
+    const token = jwt.sign({ userId: colab._id, role: 'colaborador' }, JWT_SECRET, { expiresIn: '30m' });
     return res.json({ token, user: colab.toJSON() });
   } catch (err) {
     return res.status(500).json({ message: 'Error en el servidor' });
@@ -72,4 +72,4 @@ const loginColab = async (req, res) => {
 };
 
 module.exports = { loginController, registerController, loginAdmin, loginColab };
-
+*/
