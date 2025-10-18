@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-const INACTIVITY_LIMIT = 15 * 60 * 1000; // 30 minutos
+const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutos
 
 export default function InactivityLogout() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function InactivityLogout() {
 
   const cerrarSesion = () => {
     localStorage.removeItem("authToken");
+    localStorage.removeItem("userData");
     alert("Sesión cerrada por inactividad");
     router.push("/login");
   };
@@ -22,9 +23,11 @@ export default function InactivityLogout() {
 
   useEffect(() => {
     const eventos = ["mousemove", "keydown", "click", "scroll"];
+
     eventos.forEach((evento) =>
       window.addEventListener(evento, reiniciarTemporizador)
     );
+
     reiniciarTemporizador();
 
     return () => {

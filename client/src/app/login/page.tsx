@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { API_URL } from "@/services/api"; // Importado de la otra rama
 
 interface LoginPageProps {
   userType?: "colaborador" | "admin";
@@ -21,10 +22,10 @@ export default function LoginPage({ userType }: LoginPageProps) {
     setError("");
 
     try {
-      // 🔸 Endpoint dinámico según el tipo de usuario
-      let endpoint = "http://localhost:5000/api/auth/login";
-      if (userType === "colaborador") endpoint = "http://localhost:5000/api/auth/login-colaborador";
-      if (userType === "admin") endpoint = "http://localhost:5000/api/auth/login-admin";
+      // 🔸 Endpoint dinámico según el tipo de usuario (Lógica de tu rama)
+      let endpoint = `${API_URL}/auth/login`; // Usa API_URL aquí
+      if (userType === "colaborador") endpoint = `${API_URL}/auth/login-colaborador`;
+      if (userType === "admin") endpoint = `${API_URL}/auth/login-admin`;
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -40,14 +41,16 @@ export default function LoginPage({ userType }: LoginPageProps) {
         return;
       }
 
+      // ✅ Almacenamiento de token (Lógica de tu rama)
       localStorage.setItem("authToken", data.token);
 
-      // 🔸 Redirección según tipo
+      // 🔸 Redirección según tipo (Lógica de tu rama)
       if (userType === "admin") router.push("/admin-dashboard");
       else if (userType === "colaborador") router.push("/dashboard-colaborador");
       else router.push("/dashboard");
 
     } catch (err) {
+      // Manejo de errores de tu rama (más útil para el usuario)
       setError("Error de conexión. Asegúrate de que el servidor Express esté encendido (Puerto 5000).");
     } finally {
       setLoading(false);
@@ -55,6 +58,7 @@ export default function LoginPage({ userType }: LoginPageProps) {
   };
 
   return (
+    // Se mantiene el JSX (diseño) de tu rama (más detallado)
     <div
       className="flex flex-col items-center justify-center min-h-screen text-white p-6 relative"
       style={{
@@ -66,16 +70,16 @@ export default function LoginPage({ userType }: LoginPageProps) {
     >
       <div
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0,0,0,0.65)',
+          width: "100%",
+          height: "100%",
+          background: "rgba(0,0,0,0.65)",
           zIndex: 0,
         }}
       />
-      <div style={{ position: 'relative', zIndex: 2, width: '100%' }}>
+      <div style={{ position: "relative", zIndex: 2, width: "100%" }}>
         <div className="flex flex-col items-center justify-center min-h-[80vh] w-full">
           {/* BOTÓN VOLVER AL INICIO */}
           <div className="w-full flex justify-center mb-4">
@@ -152,16 +156,17 @@ export default function LoginPage({ userType }: LoginPageProps) {
               </div>
             </form>
 
-            {userType ? null : (
+            {!userType && (
               <div className="text-center text-sm text-gray-400 space-y-2">
-                {userType ? null : (
-                  <div>
-                    ¿No tienes cuenta?{" "}
-                    <a href="/register" className="font-medium text-red-400 hover:text-red-300">
-                      Regístrate aquí
-                    </a>
-                  </div>
-                )}
+                <div>
+                  ¿No tienes cuenta?{" "}
+                  <a
+                    href="/register"
+                    className="font-medium text-red-400 hover:text-red-300"
+                  >
+                    Regístrate aquí
+                  </a>
+                </div>
                 <div>
                   <button
                     type="button"
@@ -170,8 +175,6 @@ export default function LoginPage({ userType }: LoginPageProps) {
                   >
                     {userType === "admin"
                       ? "¿Recuperar contraseña de administrador?"
-                      : userType === "colaborador"
-                      ? "¿Recuperar contraseña de colaborador?"
                       : "¿Olvidaste tu contraseña?"}
                   </button>
                 </div>

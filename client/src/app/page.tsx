@@ -148,10 +148,7 @@ export default function HomePage() {
       const next = prev + 1;
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(
-        () => setLogoClickCount(0),
-        TIMEOUT_DURATION
-      );
+      timeoutRef.current = setTimeout(() => setLogoClickCount(0), TIMEOUT_DURATION);
 
       return next;
     });

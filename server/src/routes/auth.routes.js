@@ -1,36 +1,32 @@
-// server/src/routes/auth.routes.js (VERSIÓN FINAL RESUELTA)
+// server/src/routes/auth.routes.js
 
 const express = require('express');
 const router = express.Router(); 
 
-// --- Importaciones de Controladores (Estructura Modular) ---
+// --- Importaciones de controladores ---
 const { loginController, registerController } = require('../controllers/authController');
 const { recoverPassword, verifyEmail } = require('../controllers/recoverController.js'); 
-const authMiddleware = require('./middleware/authMiddleware'); // <--- SÓLO UNA DECLARACIÓN
+const authMiddleware = require('./middleware/authMiddleware'); 
 
-// --- Rutas de Autenticación y Login ---
+// --- Rutas de registro y login ---
 router.post('/register', registerController);
 router.post('/login', loginController);
-// Alias para compatibilidad (Se mantienen desde presentation/final-demo)
+
+// Alias para compatibilidad (login unificado)
 router.post('/login-admin', loginController);
 router.post('/login-colaborador', loginController);
 
-// --- Rutas de Recuperación (Se mantienen desde presentation/final-demo) ---
+// --- Rutas de recuperación de contraseña ---
 router.post('/recover-password', recoverPassword); 
 router.get('/recover-password', verifyEmail); 
 
-// --- Rutas Protegidas ---
-
-// Mantenemos la ruta /protegida original de presentation/final-demo
+// --- Ruta protegida de ejemplo ---
 router.get('/protegida', authMiddleware, (req, res) => {
-    res.json({
-        mensaje: 'Acceso autorizado',
-        userId: req.userId.userId,
-        tipoUsuario: req.userId.tipoUsuario
-    });
+  res.json({
+    mensaje: 'Acceso autorizado',
+    userId: req.userId, // El middleware asigna solo el ID
+    // Para más datos, el middleware debería asignarlos a req.user
+  });
 });
-
-// Nota: La ruta /comprar no fue incluida porque causaba inconsistencia en el uso de req.user/req.userId.
-// La versión estable de /protegida fue la elegida.
 
 module.exports = router;

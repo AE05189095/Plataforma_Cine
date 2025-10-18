@@ -1,4 +1,4 @@
-// server/index.js (CÓDIGO FINAL CORREGIDO)
+// server/index.js (CÓDIGO FINAL CONSOLIDADO)
 
 require('dotenv').config();
 
@@ -7,13 +7,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 // ==========================================================
-// 🔑 IMPORTACIÓN DE RUTAS (Una sola vez para cada ruta) 🔑
+// 🔑 IMPORTACIÓN DE RUTAS 🔑
 // ==========================================================
 const authRoutes = require('./src/routes/auth.routes.js');
-const movieRoutes = require("./src/routes/movie.routes.js"); // <--- Mantenemos la primera importación
-const showtimeRoutes = require('./src/routes/showtime.routes'); // <--- Importaciones movidas aquí
-const purchaseRoutes = require('./src/routes/purchase.routes'); // <--- Importaciones movidas aquí
-// const userRoutes = require('./src/routes/user.routes.js'); // Descomentar si es necesario
+const movieRoutes = require("./src/routes/movie.routes.js");
+const showtimeRoutes = require('./src/routes/showtime.routes.js');
+const purchaseRoutes = require('./src/routes/purchase.routes.js');
+const hallRoutes = require("./src/routes/hall.routes.js"); // 🆕 Rutas de Salas
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,59 +22,46 @@ const MONGODB_URI = process.env.MONGODB_URI;
 // ==========================================================
 // CONFIGURACIÓN DE MIDDLEWARES Y CORS
 // ==========================================================
-
-// Middleware CORS
 app.use(cors({
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true
+  origin: '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true
 }));
 
-// Middleware para procesar JSON
-app.use(express.json()); 
-
+app.use(express.json()); // Middleware para procesar JSON
 
 // ==========================================================
-// 🚀 RUTAS DE LA API (Consolidado) 🚀
+// 🚀 MONTAJE DE RUTAS DE LA API 🚀
 // ==========================================================
-
-// Todas las rutas de autenticación irán bajo /api/auth
 app.use('/api/auth', authRoutes);
-
-// Rutas de contenido (Películas, funciones, compras)
 app.use('/api/movies', movieRoutes); 
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
-// app.use('/api/users', userRoutes); // Descomentar si es necesario
+app.use("/api/halls", hallRoutes); // Ruta de Salas
 
 // Ruta de prueba
 app.get('/', (req, res) => {
-    res.send('Servidor de Plataforma Cine en línea.');
+  res.send('Servidor de Plataforma Cine en línea.');
 });
-
 
 // ==========================================================
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
 // ==========================================================
-
-// Validar que la URI de MongoDB esté definida
 if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
-    console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
-    console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
-    console.error('    MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
-    process.exit(1);
+  console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es válida.');
+  console.error('Crea un archivo .env en la carpeta server con la URI de tu base de datos.');
+  process.exit(1);
 }
 
-// Conectar a MongoDB
 mongoose.connect(MONGODB_URI)
-    .then(() => {
-        console.log('✅ Conectado a MongoDB');
+  .then(() => {
+    console.log('✅ Conectado a MongoDB');
 
-        app.listen(PORT, () => {
-            console.log(`🚀 Servidor Express escuchando en el puerto ${PORT}`);
-        });
-    })
-    .catch(err => {
-        console.error('❌ ERROR al conectar a MongoDB:', err.message || err);
-        process.exit(1);
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor Express escuchando en el puerto ${PORT}`);
     });
+  })
+  .catch(err => {
+    console.error('❌ ERROR al conectar a MongoDB:', err.message || err);
+    process.exit(1);
+  });
