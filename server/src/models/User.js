@@ -20,7 +20,11 @@ const userSchema = new mongoose.Schema(
 );
 
 // 🔑 MIDDLEWARE (PRE-SAVE HOOK): Encriptar la contraseña antes de guardarla 🔑
+<<<<<<< HEAD
 /*userSchema.pre("save", async function (next) {
+=======
+userSchema.pre("save", async function (next) {
+>>>>>>> mapa-asientos
     // Solo hashea si la contraseña ha sido modificada (o es nueva)
     if (!this.isModified("password")) {
         return next();
@@ -32,7 +36,11 @@ const userSchema = new mongoose.Schema(
     } catch (err) {
         next(err);
     }
+<<<<<<< HEAD
 });*/
+=======
+});
+>>>>>>> mapa-asientos
 
 // Método para comparar contraseñas (útil en el login)
 userSchema.methods.comparePassword = async function (candidatePassword) {

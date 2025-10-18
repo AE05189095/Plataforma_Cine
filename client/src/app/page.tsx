@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
@@ -237,4 +238,11 @@ export default function HomePage() {
       </main>
     </div>
   );
+=======
+import { redirect } from "next/navigation";
+
+// 🚀 Redirige automáticamente al cargar la página raíz "/"
+export default function HomeRedirect() {
+  redirect("/movies");
+>>>>>>> mapa-asientos
 }

@@ -16,9 +16,15 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+<<<<<<< HEAD
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+=======
+    "@types/node": "^20.19.21",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+>>>>>>> mapa-asientos
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "tailwindcss": "^4",
