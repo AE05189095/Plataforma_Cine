@@ -1,5 +1,10 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+
+
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
+
 
 // Crear una compra (reserva) y bloquear asientos
 exports.create = async (req, res) => {
@@ -101,6 +106,24 @@ exports.create = async (req, res) => {
     session.endSession();
   }
 };
+// Confirmar compra y enviar email de confirmación
+
+const confirmPurchase = async (req, res) => {
+  try {
+    const { userEmail, movie, date, time, room, seat } = req.body;
+
+    const code = generateConfirmationCode(); // tu función para generar código
+
+    // Guardar la compra en la base de datos (si aplica)
+
+    await sendConfirmationEmail(userEmail, { movie, date, time, room, seat, code });
+
+    res.status(200).json({ message: 'Compra confirmada y correo enviado', code });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al confirmar la compra' });
+  }
+};
+
 
 // Obtener compras de un usuario
 exports.listByUser = async (req, res) => {
