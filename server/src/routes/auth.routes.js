@@ -4,7 +4,9 @@ const express = require('express');
 const router = express.Router(); 
 
 
-const { loginController, registerController } = require('../controllers/authController');
+const { loginController, registerController, meController, changePasswordController } = require('../controllers/authController');
+
+const authMiddleware = require('./middleware/authMiddleware');
 
 
 const { recoverPassword, verifyEmail } = require('../controllers/recoverController.js'); 
@@ -21,6 +23,10 @@ router.post('/recover-password', recoverPassword);
 
 
 router.get('/recover-password', verifyEmail); 
+
+// Rutas protegidas
+router.get('/me', authMiddleware, meController);
+router.post('/change-password', authMiddleware, changePasswordController);
 
 
 

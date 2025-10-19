@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutos
@@ -9,15 +9,15 @@ export default function InactivityLogout() {
   const router = useRouter();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const cerrarSesion = () => {
+  const cerrarSesion = useCallback(() => {
     alert("Sesión cerrada por inactividad");
     router.push("/login");
-  };
+  }, [router]);
 
-  const reiniciarTemporizador = () => {
+  const reiniciarTemporizador = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(cerrarSesion, INACTIVITY_LIMIT);
-  };
+  }, [cerrarSesion]);
 
   useEffect(() => {
     const eventos = ["mousemove", "keydown", "click", "scroll"];
@@ -32,7 +32,7 @@ export default function InactivityLogout() {
       );
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, []);
+  }, [reiniciarTemporizador]);
 
   return null;
 }

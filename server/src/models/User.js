@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
     // Correo electrónico (único)
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     // Contraseña encriptada
-    password: { type: String, required: true },
+    password: { type: String, required: true, select: false },
     // Tipo de usuario: 'cliente' por defecto
     tipoUsuario: { type: String, enum: ["cliente", "admin"], default: "cliente" },
   },

@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { API_BASE, TOKEN_KEY } from '@/lib/config';
 
 interface LoginPageProps {
   userType?: "colaborador" | "admin";
 }
 
 export default function LoginPage({ userType }: LoginPageProps) {
-  const pathname = usePathname();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -22,9 +22,9 @@ export default function LoginPage({ userType }: LoginPageProps) {
 
     try {
       // 🔸 Endpoint dinámico según el tipo de usuario
-      let endpoint = "http://localhost:5000/api/auth/login";
-      if (userType === "colaborador") endpoint = "http://localhost:5000/api/auth/login-colaborador";
-      if (userType === "admin") endpoint = "http://localhost:5000/api/auth/login-admin";
+  let endpoint = `${API_BASE}/api/auth/login`;
+  if (userType === "colaborador") endpoint = `${API_BASE}/api/auth/login-colaborador`;
+  if (userType === "admin") endpoint = `${API_BASE}/api/auth/login-admin`;
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -40,14 +40,24 @@ export default function LoginPage({ userType }: LoginPageProps) {
         return;
       }
 
-      localStorage.setItem("authToken", data.token);
+  localStorage.setItem(TOKEN_KEY, data.token);
+      // Dispatch event so header updates without reload
+      try { window.dispatchEvent(new CustomEvent('authChange')); } catch {}
 
-      // 🔸 Redirección según tipo
-      if (userType === "admin") router.push("/admin-dashboard");
-      else if (userType === "colaborador") router.push("/dashboard-colaborador");
-      else router.push("/dashboard");
+      // redirección prioritaria: ?next=
+      // Obtener el next param desde la URL actual en cliente
+      const next = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+      if (next) {
+        router.push(next);
+        return;
+      }
 
-    } catch (err) {
+  // 🔸 Redirección según tipo
+  if (userType === "admin") router.push("/admin-dashboard");
+  else if (userType === "colaborador") router.push("/dashboard-colaborador");
+  else router.push("/profile");
+
+    } catch {
       setError("Error de conexión. Asegúrate de que el servidor Express esté encendido (Puerto 5000).");
     } finally {
       setLoading(false);

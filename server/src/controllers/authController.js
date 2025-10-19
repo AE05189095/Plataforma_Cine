@@ -57,13 +57,9 @@ const registerController = async (req, res) => {
             return res.status(400).json({ message: "El correo ya está registrado." });
         }
 
-        // 🔑 HASHING antes de guardar (Si User.js no lo hace automáticamente)
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        user = new User({ username, email, password: hashedPassword, tipoUsuario: "cliente" });
-
-        await user.save(); 
+        // Dejar que el pre-save hook del modelo haga el hash de la contraseña
+        user = new User({ username, email, password, tipoUsuario: "cliente" });
+        await user.save();
 
         res.status(201).json({ 
             success: true,

@@ -1,15 +1,15 @@
-"use client"; 
+"use client";
 
-import React, { useState } from 'react'; 
-import Image from 'next/image'; 
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
-// 🚨 FUNCIÓN PARA CREAR SLUG (Ruta amigable)
+// FUNCION PARA CREAR SLUG (Ruta amigable)
 const createSlug = (title: string): string => {
     return title
         .toLowerCase()
         .trim()
-        .replace(/[^\w\s-]/g, '') // Remueve puntuación
+        .replace(/[^\w\s-]/g, '') // Remueve puntuacion
         .replace(/[\s_-]+/g, '-') // Reemplaza espacios y guiones bajos con guiones
         .replace(/^-+|-+$/g, ''); // Remueve guiones al inicio/final
 };
@@ -26,15 +26,15 @@ interface MovieCardProps {
 
 export default function MovieCard({ title, image, rating, score, genre, duration, description }: MovieCardProps) {
     const router = useRouter();
-    const [isHovered, setIsHovered] = useState(false); 
+    const [isHovered, setIsHovered] = useState(false);
     
-    // 🚨 GENERAMOS EL SLUG
+    // GENERAMOS EL SLUG
     const movieSlug = createSlug(title);
 
-    // 🚨 La ruta dinámica ahora incluye el slug
+    // La ruta dinamica ahora incluye el slug
     const navigateToDetails = (e?: React.MouseEvent) => {
-        if (e) e.stopPropagation(); 
-        router.push(`/movies/${movieSlug}`); // <--- RUTA DINÁMICA CLAVE
+        if (e) e.stopPropagation();
+        router.push(`/movies/${movieSlug}`); // <--- RUTA DINAMICA CLAVE
     };
     
     // Al hacer clic en la tarjeta (cualquier parte)
@@ -42,12 +42,12 @@ export default function MovieCard({ title, image, rating, score, genre, duration
         navigateToDetails();
     };
     
-    // Al hacer clic en el botón "Ver detalles" (para detener la propagación)
+    // Al hacer clic en el boton "Ver detalles" (para detener la propagacion)
     const handleDetailsClick = (e: React.MouseEvent) => {
         navigateToDetails(e);
     };
 
-    // Al hacer clic en el botón de funciones
+    // Al hacer clic en el boton de funciones
     const handleFuncionesClick = (e: React.MouseEvent) => {
         navigateToDetails(e);
     };
@@ -59,7 +59,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
             onMouseEnter={() => setIsHovered(true)} 
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* CONTENEDOR DE IMAGEN (HOVER Y BOTÓN) */}
+            {/* CONTENEDOR DE IMAGEN (HOVER Y BOTON) */}
             <div 
                 className={`
                     aspect-[3/4] bg-gray-800 rounded-lg overflow-hidden shadow-xl 
@@ -67,7 +67,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                     ${isHovered ? 'border-orange-500 scale-[1.03]' : 'border-gray-700'} 
                 `}
             >
-                {/* Imagen */}
+                {/* Imagen CORREGIDA: Uso basico de 'fill' y 'sizes' */}
                 <Image 
                     src={image} 
                     alt={`Poster de ${title}`} 
@@ -77,7 +77,7 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                     className="transition-all duration-300"
                 />
                 
-                {/* Botón Ver Detalles aparece en hover */}
+                {/* Boton Ver Detalles aparece en hover */}
                 <div 
                     className={`
                         absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center 
@@ -110,27 +110,27 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                 
             </div>
             
-            {/* Título */}
+            {/* Titulo */}
             <h3 className="text-xl font-bold mt-3 mb-1 truncate">{title}</h3>
             
-            {/* Metadata (Género y Duración) */}
+            {/* Metadata (Genero y Duracion) */}
             <div className="flex justify-between items-center text-sm text-gray-300"> 
-                {/* Género (Izquierda) */}
+                {/* Genero (Izquierda) */}
                 <span className="font-semibold text-red-500">{genre}</span>
                 
-                {/* Duración (Derecha) */}
+                {/* Duracion (Derecha) */}
                 <div className="flex items-center space-x-1">
                     <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <span>{duration}</span>
                 </div>
             </div>
 
-            {/* Descripción */}
+            {/* Descripcion */}
             <p className="text-sm text-gray-400 mt-2 line-clamp-2" title={description}>
                 {description}
             </p>
 
-            {/* Botón de Funciones - Degradado Rojo a Naranja */}
+            {/* Boton de Funciones - Degradado Rojo a Naranja */}
             <button 
                 onClick={handleFuncionesClick}
                 className={`
