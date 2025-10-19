@@ -10,7 +10,7 @@ import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 
 // ==========================================================
-// INTERFACES (Definidas globalmente para su uso en ambos componentes)
+// INTERFACES Y DATOS DE PRÓXIMO ESTRENO
 // ==========================================================
 
 interface ShowTime {
@@ -26,11 +26,12 @@ interface MovieData {
     title: string;
     image?: string;
     rating?: string;
-    score?: number; // Espera number o undefined (CORREGIDO)
+    score?: number;
     genre?: string;
     duration?: string;
     description?: string;
     slug: string;
+    isUpcoming?: boolean; 
 }
 
 interface RawMovieResponse {
@@ -38,13 +39,30 @@ interface RawMovieResponse {
     name?: string | null;
     posterUrl?: string | null;
     images?: (string | null)[];
-    rating?: number | string | null; // Puede ser string o number
+    rating?: number | string | null;
     score?: number | null;
     genres?: string[] | null;
     duration?: number | string | null;
     description?: string | null;
     slug?: string | null;
 }
+
+// 🚨 DATOS HARDCODEADOS PARA EL PRÓXIMO ESTRENO
+const UPCOMING_SLUG = '200-lobo';
+const UPCOMING_RELEASE_DATE = '2025-11-30'; 
+const UPCOMING_DISPLAY_DATE = '30/11/2025'; 
+
+const UPCOMING_MOVIE_DATA: MovieData & { isUpcoming: true } = {
+    title: "200% Lobo",
+    image: "/images/lobo_200.jpg",
+    rating: "G",
+    score: 5.0,
+    genre: "Animación, Comedia",
+    duration: "95 min",
+    description: "La esperada secuela animada del divertido lobo Freddy Lupin, que descubre su verdadero destino. ¡Una gran aventura familiar que se estrena el 30 de Noviembre de 2025!",
+    slug: UPCOMING_SLUG,
+    isUpcoming: true,
+};
 
 // ==========================================================
 // FUNCIONES DE UTILIDAD
@@ -60,32 +78,26 @@ const createSlug = (title: string): string => {
         .replace(/^-+|-+$/g, '');
 };
 
-// Función para PROCESAR la URL de la Imagen (CORRECCIÓN IMAGEN)
+// Función para PROCESAR la URL de la Imagen
 const getPosterUrl = (movieJson: RawMovieResponse): string => {
     const defaultImage = '/images/movie-default.svg';
     let imagePath = '';
     
-    // 1. Priorizar posterUrl
     if (movieJson.posterUrl) {
         imagePath = movieJson.posterUrl;
     } else if (movieJson.images && movieJson.images.length > 0 && movieJson.images[0]) {
-        // 2. Fallback a images[0]
         imagePath = movieJson.images[0];
     } else if (movieJson.title || movieJson.name) {
-        // 3. Fallback inteligente usando el slug
         const title = movieJson.title || movieJson.name || 'default';
         const movieSlug = movieJson.slug || createSlug(title);
         imagePath = `${movieSlug.toLowerCase()}.jpg`;
     }
 
-    // 4. Procesar la ruta (Añadir prefijo /images/ si no es una URL externa)
     if (imagePath && !imagePath.startsWith('http')) {
         const filename = imagePath.split('/').pop() || imagePath;
-        // Aseguramos que la ruta apunte a la carpeta 'public/images'
         return `/images/${filename.toLowerCase()}`;
     }
 
-    // 5. Fallback final
     return defaultImage;
 };
 
@@ -108,8 +120,29 @@ export default function MovieDetailPage() {
 
         const fetchData = async () => {
             setLoading(true);
+
+            // 🚨 1. LÓGICA DE EXCEPCIÓN: 200% Lobo
+            if (slug === UPCOMING_SLUG) {
+                setMovie(UPCOMING_MOVIE_DATA);
+                
+                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
+                // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
+                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
+                
+                // Simulación de horarios con la fecha de estreno
+                const simulatedShowtimes: ShowTime[] = [
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
+                ];
+                
+                setShowtimes(simulatedShowtimes);
+                setLoading(false);
+                return; // Finaliza la ejecución para el próximo estreno
+            }
+
+            // 2. Obtener datos de la película (Lógica normal de API)
             try {
-                // 1. Obtener datos de la película
                 const resMovie = await fetch(`${API_BASE}/api/movies/${slug}`);
                 if (resMovie.status === 404) {
                     setNotFound(true);
@@ -118,29 +151,25 @@ export default function MovieDetailPage() {
                 }
                 const movieJson: RawMovieResponse = await resMovie.json();
 
-                // Usamos la función corregida para obtener la URL
                 const finalPosterSrc = getPosterUrl(movieJson);
 
                 setMovie({
                     title: movieJson.title || movieJson.name || 'Sin título',
-                    image: finalPosterSrc, // Asignar la URL ya procesada
+                    image: finalPosterSrc,
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
-                    
-                    // 🚨 CORRECCIÓN TIPADO 'score': Aseguramos que solo se asignan números
                     score: (typeof movieJson.rating === 'number' && movieJson.rating) 
                            || (typeof movieJson.score === 'number' && movieJson.score) 
                            || undefined, 
-                    // -------------------------------------------------------------
-                           
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',
                     slug: movieJson.slug || slug,
+                    isUpcoming: false, // Película normal
                 });
 
-                setPosterSrc(finalPosterSrc); // Usar la URL ya procesada
+                setPosterSrc(finalPosterSrc);
 
-                // 2. Obtener horarios
+                // 3. Obtener horarios (Lógica normal de API)
                 const resShow = await fetch(`${API_BASE}/api/showtimes`);
                 const showJson = await resShow.json();
                 
@@ -165,6 +194,7 @@ export default function MovieDetailPage() {
 
                 const mapped: ShowTime[] = filtered.map((s: RawShowtime) => {
                     const start = s.startAt ? new Date(s.startAt) : null;
+                    // Solo la hora para películas normales
                     const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
                     let hallName = 'Sala';
                     const capacity = 80;
@@ -189,7 +219,7 @@ export default function MovieDetailPage() {
                     };
                 });
                 
-                // Si hay menos de 5 horarios, generar horarios adicionales (simulados)
+                // Simulación de horarios si faltan
                 const ensureFive: ShowTime[] = [...mapped];
                 if (ensureFive.length < 5) {
                     const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
@@ -229,6 +259,10 @@ export default function MovieDetailPage() {
         );
     }
 
+    // Obtener la bandera isUpcoming del objeto movie (si fue cargado por la excepción)
+    const isUpcoming = movie?.isUpcoming || false;
+    const upcomingReleaseText = `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+
     if (notFound || !movie) {
         return (
             <div className="min-h-screen bg-black text-white p-8 text-center">
@@ -251,12 +285,17 @@ export default function MovieDetailPage() {
                             width={400}
                             height={600}
                             style={{ objectFit: 'cover', width: '100%', height: '100%' }}
-                            // Manejo de error de carga para usar el default.svg
                             onError={() => setPosterSrc('/images/movie-default.svg')} 
                         />
                     </div>
                     <div className="flex-1 flex flex-col justify-center">
-                        <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">{movie.title}</h1>
+                        {/* Título y estado de estreno */}
+                        <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">
+                            {movie.title}
+                            {isUpcoming && (
+                                <span className="block text-xl font-medium text-green-400 mt-2">{upcomingReleaseText}</span>
+                            )}
+                        </h1>
                         <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
                             <span className="font-semibold text-lg">{movie.duration}</span>
                             <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">{movie.genre}</span>
@@ -268,13 +307,20 @@ export default function MovieDetailPage() {
                 </div>
 
                 <div className="mt-12">
-                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">Horarios Disponibles</h2>
+                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">
+                        {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
+                    </h2>
                     {showtimes.length === 0 ? (
-                        <p className="text-gray-400">No hay funciones disponibles para esta película.</p>
+                        <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para esta película."}</p>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {showtimes.map((show) => (
-                                <MovieShowtimeCard key={show.id} show={show} movieSlug={movie.slug} />
+                                <MovieShowtimeCard 
+                                    key={show.id} 
+                                    show={show} 
+                                    movieSlug={movie.slug} 
+                                    isUpcoming={isUpcoming} 
+                                />
                             ))}
                         </div>
                     )}
@@ -288,8 +334,12 @@ export default function MovieDetailPage() {
 // COMPONENTE SECUNDARIO
 // ==========================================================
 
-function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: string }) {
+// ACTUALIZADO: Acepta la bandera isUpcoming
+function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; movieSlug: string; isUpcoming?: boolean }) {
     const router = useRouter();
+
+    // Lógica para cambiar el botón
+    const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
         const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
@@ -298,11 +348,15 @@ function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: str
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
-            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p>
+            {/* Si es estreno, muestra la fecha completa, si no, solo la hora */}
+            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
             <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
-                <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">Comprar</button>
+                {/* Botón modificado para usar el texto condicional */}
+                <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
+                    {buttonText}
+                </button>
             </div>
         </div>
     );

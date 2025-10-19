@@ -14,6 +14,7 @@ const createSlug = (title: string): string => {
         .replace(/^-+|-+$/g, ''); // Remueve guiones al inicio/final
 };
 
+// 🚨 ACTUALIZADO: Incluye isUpcoming
 interface MovieCardProps {
     title: string;
     image: string;
@@ -22,9 +23,10 @@ interface MovieCardProps {
     genre: string;
     duration: string;
     description: string;
+    isUpcoming?: boolean; 
 }
 
-export default function MovieCard({ title, image, rating, score, genre, duration, description }: MovieCardProps) {
+export default function MovieCard({ title, image, rating, score, genre, duration, description, isUpcoming }: MovieCardProps) {
     const router = useRouter();
     const [isHovered, setIsHovered] = useState(false);
     
@@ -34,7 +36,8 @@ export default function MovieCard({ title, image, rating, score, genre, duration
     // La ruta dinamica ahora incluye el slug
     const navigateToDetails = (e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        router.push(`/movies/${movieSlug}`); // <--- RUTA DINAMICA CLAVE
+        // 🚨 IMPORTANTE: Asegúrate de que esta ruta coincida con tu estructura de Next.js
+        router.push(`/movies/${movieSlug}`); 
     };
     
     // Al hacer clic en la tarjeta (cualquier parte)
@@ -110,8 +113,18 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                 
             </div>
             
-            {/* Titulo */}
-            <h3 className="text-xl font-bold mt-3 mb-1 truncate">{title}</h3>
+            {/* Titulo y etiqueta "PRÓXIMAMENTE" */}
+            <div className="flex items-center space-x-2 mt-3 mb-1 min-h-[1.75rem]">
+                <h3 className="text-xl font-bold truncate flex-grow"> {/* 🚨 flex-grow para que el título ocupe el espacio */}
+                    {title}
+                </h3>
+                {/* CAJA DE PRÓXIMAMENTE */}
+                {isUpcoming && (
+                    <span className="bg-green-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                        Próximamente
+                    </span>
+                )}
+            </div>
             
             {/* Metadata (Genero y Duracion) */}
             <div className="flex justify-between items-center text-sm text-gray-300"> 
