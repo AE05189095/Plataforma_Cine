@@ -1,11 +1,21 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { API_BASE } from '@/lib/config';
 import { getPriceForHall } from '@/lib/pricing';
 import Header from "@/components/Header";
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
+
+// FUNCION DE SLUG (para usar en el cliente si es necesario)
+const createSlug = (title: string): string => {
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
 
 interface ShowTime {
     time: string;
@@ -18,7 +28,7 @@ interface ShowTime {
 
 interface MovieData {
     title: string;
-    image?: string;
+    image?: string; // posterUrl o image de la API
     rating?: string;
     score?: number;
     genre?: string;
@@ -27,16 +37,46 @@ interface MovieData {
     slug: string;
 }
 
+// FUNCION PARA OBTENER LA URL DE LA IMAGEN
+const getImageURL = (movie: MovieData): string => {
+    let imagePath = '';
+    
+    // 1. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
+    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
+        imagePath = movie.image;
+    }
+    
+    // 2. Si no hay posterUrl válido, usar el slug
+    if (!imagePath || imagePath.includes('movie-default.svg')) {
+        const slug = movie.slug || createSlug(movie.title);
+        // Asume que el archivo local es [slug].jpg. CAMBIA .jpg si usas .png o .webp
+        imagePath = `${slug}.jpg`; 
+    }
+
+    // 3. Procesar y devolver la ruta final relativa a /public/images/
+    if (imagePath && !imagePath.startsWith('http')) {
+        const filename = imagePath.split('/').pop() || imagePath;
+        return `/images/${filename.toLowerCase()}`; 
+    }
+
+    // 4. Fallback final
+    return '/images/movie-default.svg';
+};
+
 export default function MovieDetailPage() {
     const params = useParams();
     const slug = params.slug as string;
-        // router no se usa aquí (se usa dentro de MovieShowtimeCard)
 
     const [movie, setMovie] = useState<MovieData | null>(null);
     const [posterSrc, setPosterSrc] = useState<string>('/images/movie-default.svg');
     const [showtimes, setShowtimes] = useState<ShowTime[]>([]);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    
+    // Usamos useCallback para que la función no cambie en cada render
+    const updatePosterSrc = useCallback((newSrc: string) => {
+        setPosterSrc(getImageURL({ ...movie!, image: newSrc }));
+    }, [movie]);
 
     useEffect(() => {
         if (!slug) return;
@@ -44,6 +84,7 @@ export default function MovieDetailPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
+                // FETCH MOVIE DETAIL
                 const resMovie = await fetch(`${API_BASE}/api/movies/${slug}`);
                 if (resMovie.status === 404) {
                     setNotFound(true);
@@ -51,86 +92,88 @@ export default function MovieDetailPage() {
                     return;
                 }
                 const movieJson = await resMovie.json();
-                setMovie({
+                
+                const movieData: MovieData = {
                     title: movieJson.title || movieJson.name || 'Sin título',
-                    image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '/images/movie-default.svg',
+                    image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
                     score: movieJson.rating || movieJson.score,
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',
                     slug: movieJson.slug || slug,
-                });
+                };
+                
+                setMovie(movieData);
 
-                // establecer la fuente del póster (fallback si falla la carga)
-                setPosterSrc(movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '/images/movie-default.svg');
+                // establecer la fuente del póster (usando la nueva lógica de generación)
+                setPosterSrc(getImageURL(movieData));
 
+                // FETCH SHOWTIMES (lógica existente)
                 const resShow = await fetch(`${API_BASE}/api/showtimes`);
                 const showJson = await resShow.json();
-                                        type RawShowtime = {
-                                            movie?: { slug?: string } | string | null;
-                                            startAt?: string | null;
-                                            time?: string;
-                                            hall?: { name?: string; capacity?: number } | string | null;
-                                            seatsBooked?: string[];
-                                            price?: number;
-                                            _id?: string;
-                                            availableSeats?: number;
-                                        };
 
-                                        const filtered = Array.isArray(showJson)
-                                            ? (showJson as RawShowtime[]).filter((s) => {
-                                                    if (!s.movie) return false;
-                                                    if (typeof s.movie === 'string') return false;
-                                                    return typeof s.movie === 'object' && (s.movie as { slug?: string }).slug === slug;
-                                                })
-                                            : [];
+                type RawShowtime = {
+                    movie?: { slug?: string } | string | null;
+                    startAt?: string | null;
+                    time?: string;
+                    hall?: { name?: string; capacity?: number } | string | null;
+                    seatsBooked?: string[];
+                    price?: number;
+                    _id?: string;
+                    availableSeats?: number;
+                };
 
-                                        const mapped: ShowTime[] = filtered.map((s: RawShowtime) => {
-                                            const start = s.startAt ? new Date(s.startAt) : null;
-                                            const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
-                                            let hallName = 'Sala';
-                                            // Forzar que todas las salas muestren 80 asientos
-                                            const capacity = 80;
-                                            if (s.hall && typeof s.hall === 'object') {
-                                                hallName = (s.hall as { name?: string }).name ?? 'Sala';
-                                            } else if (typeof s.hall === 'string') {
-                                                hallName = s.hall;
-                                            }
-                                            const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-                                            const available = Math.max(0, capacity - seatsBooked);
-                                            const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
-                                            return {
-                                                time: timeStr,
-                                                sala: hallName,
-                                                price: numericPrice,
-                                                availableSeats: available,
-                                                id: s._id,
-                                                startISO: start ? start.toISOString() : undefined,
-                                            };
-                                        });
+                const filtered = Array.isArray(showJson)
+                    ? (showJson as RawShowtime[]).filter((s) => {
+                        if (!s.movie) return false;
+                        if (typeof s.movie === 'string') return false;
+                        return typeof s.movie === 'object' && (s.movie as { slug?: string }).slug === slug;
+                    })
+                    : [];
 
-                                        // Si hay menos de 5 horarios, generar horarios adicionales (en intervalos de 2 horas)
-                                        const ensureFive: ShowTime[] = [...mapped];
-                                        if (ensureFive.length < 5) {
-                                            // Tomar base desde el primer horario si existe, si no usar ahora
-                                            const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
-                                            let addIndex = 0;
-                                            while (ensureFive.length < 5) {
-                                                addIndex += 1;
-                                                const d = new Date(baseDate.getTime() + addIndex * 2 * 60 * 60 * 1000); // +2h cada vez
-                                                const t = d.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
-                                                ensureFive.push({
-                                                    time: t,
-                                                    sala: ensureFive[0]?.sala ?? 'Sala',
-                                                    price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
-                                                    // por defecto 80 asientos cuando no hay datos reales
-                                                    availableSeats: ensureFive[0]?.availableSeats ?? 80,
-                                                    id: `${slug}-gen-${addIndex}`,
-                                                    startISO: d.toISOString(),
-                                                });
-                                            }
-                                        }
+                const mapped: ShowTime[] = filtered.map((s: RawShowtime) => {
+                    const start = s.startAt ? new Date(s.startAt) : null;
+                    const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
+                    let hallName = 'Sala';
+                    const capacity = 80;
+                    if (s.hall && typeof s.hall === 'object') {
+                        hallName = (s.hall as { name?: string }).name ?? 'Sala';
+                    } else if (typeof s.hall === 'string') {
+                        hallName = s.hall;
+                    }
+                    const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
+                    const available = Math.max(0, capacity - seatsBooked);
+                    const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
+                    return {
+                        time: timeStr,
+                        sala: hallName,
+                        price: numericPrice,
+                        availableSeats: available,
+                        id: s._id,
+                        startISO: start ? start.toISOString() : undefined,
+                    };
+                });
+
+                // Si hay menos de 5 horarios, generar horarios adicionales
+                const ensureFive: ShowTime[] = [...mapped];
+                if (ensureFive.length < 5) {
+                    const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
+                    let addIndex = 0;
+                    while (ensureFive.length < 5) {
+                        addIndex += 1;
+                        const d = new Date(baseDate.getTime() + addIndex * 2 * 60 * 60 * 1000); // +2h cada vez
+                        const t = d.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
+                        ensureFive.push({
+                            time: t,
+                            sala: ensureFive[0]?.sala ?? 'Sala',
+                            price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
+                            availableSeats: ensureFive[0]?.availableSeats ?? 80,
+                            id: `${slug}-gen-${addIndex}`,
+                            startISO: d.toISOString(),
+                        });
+                    }
+                }
 
                 setShowtimes(ensureFive);
             } catch (err) {
@@ -167,16 +210,19 @@ export default function MovieDetailPage() {
             <Header />
             <div className="p-4 sm:p-8 md:p-12 lg:p-16">
                 <div className="flex flex-col md:flex-row gap-8 mb-12">
-                                        <div className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 overflow-hidden max-h-[600px]">
-                                            <Image
-                                                src={posterSrc ?? movie.image ?? '/images/movie-default.svg'}
-                                                alt={movie.title}
-                                                width={400}
-                                                height={600}
-                                                style={{ objectFit: 'cover', width: '100%', height: '100%' }}
-                                                onError={() => setPosterSrc('/images/movie-default.svg')}
-                                            />
-                                        </div>
+                    {/* Contenedor de la Imagen: Ahora usa posterSrc generado por getImageURL */}
+                    <div className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 overflow-hidden max-h-[600px]">
+                        <Image
+                            src={posterSrc}
+                            alt={movie.title}
+                            width={400}
+                            height={600}
+                            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+                            // Si la imagen calculada (posterSrc) falla, forzamos el fallback
+                            onError={() => setPosterSrc('/images/movie-default.svg')}
+                        />
+                    </div>
+                    {/* Detalles de la Película */}
                     <div className="flex-1 flex flex-col justify-center">
                         <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">{movie.title}</h1>
                         <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
@@ -218,7 +264,6 @@ function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: str
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
             <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p>
             <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
-            {/* Precio removido por petición del diseño - ya no se muestra */}
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
                 <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">Comprar</button>
