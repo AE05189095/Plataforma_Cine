@@ -13,6 +13,9 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, select: false },
     // Tipo de usuario: 'cliente' por defecto
     tipoUsuario: { type: String, enum: ["cliente", "admin"], default: "cliente" },
+emailConfirmed: { type: Boolean, default: false },
+confirmationToken: { type: String },
+
   },
   {
     timestamps: true, // createdAt, updatedAt

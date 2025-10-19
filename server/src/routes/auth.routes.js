@@ -29,7 +29,31 @@ router.get('/me', authMiddleware, meController);
 router.post('/change-password', authMiddleware, changePasswordController);
 
 
+// Confirmar correo
+router.get('/confirm-email/:token', async (req, res) => {
+  try {
+      const { token } = req.params;
+
+          const user = await require('../models/User').findOne({ confirmationToken: token });
+              if (!user) {
+                    return res.status(400).send('Token inválido o expirado');
+                        }
+
+                            user.emailConfirmed = true;
+                                user.confirmationToken = null;
+                                    await user.save();
+
+                                        res.send('Correo confirmado correctamente');
+                                          } catch (error) {
+                                              console.error(error);
+                                                  res.status(500).send('Error en el servidor');
+                                                    }
+                                                    });
+                                                    
 
 module.exports = router;
+
+
+                                                    
 
 
