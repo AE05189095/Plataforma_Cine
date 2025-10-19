@@ -1,3 +1,5 @@
+// src/app/movies/[slug]/page.tsx
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
@@ -35,6 +37,20 @@ interface MovieData {
     duration?: string;
     description?: string;
     slug: string;
+    isUpcoming?: boolean; 
+}
+
+interface RawMovieResponse {
+    title?: string | null;
+    name?: string | null;
+    posterUrl?: string | null;
+    images?: (string | null)[];
+    rating?: number | string | null;
+    score?: number | null;
+    genres?: string[] | null;
+    duration?: number | string | null;
+    description?: string | null;
+    slug?: string | null;
 }
 
 // FUNCION PARA OBTENER LA URL DE LA IMAGEN
@@ -83,6 +99,28 @@ export default function MovieDetailPage() {
 
         const fetchData = async () => {
             setLoading(true);
+
+            // 🚨 1. LÓGICA DE EXCEPCIÓN: 200% Lobo
+            if (slug === UPCOMING_SLUG) {
+                setMovie(UPCOMING_MOVIE_DATA);
+                
+                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
+                // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
+                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
+                
+                // Simulación de horarios con la fecha de estreno
+                const simulatedShowtimes: ShowTime[] = [
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
+                ];
+                
+                setShowtimes(simulatedShowtimes);
+                setLoading(false);
+                return; // Finaliza la ejecución para el próximo estreno
+            }
+
+            // 2. Obtener datos de la película (Lógica normal de API)
             try {
                 // FETCH MOVIE DETAIL
                 const resMovie = await fetch(`${API_BASE}/api/movies/${slug}`);
@@ -97,7 +135,9 @@ export default function MovieDetailPage() {
                     title: movieJson.title || movieJson.name || 'Sin título',
                     image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
-                    score: movieJson.rating || movieJson.score,
+                    score: (typeof movieJson.rating === 'number' && movieJson.rating) 
+                           || (typeof movieJson.score === 'number' && movieJson.score) 
+                           || undefined, 
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',
@@ -195,6 +235,10 @@ export default function MovieDetailPage() {
         );
     }
 
+    // Obtener la bandera isUpcoming del objeto movie (si fue cargado por la excepción)
+    const isUpcoming = movie?.isUpcoming || false;
+    const upcomingReleaseText = `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+
     if (notFound || !movie) {
         return (
             <div className="min-h-screen bg-black text-white p-8 text-center">
@@ -224,7 +268,13 @@ export default function MovieDetailPage() {
                     </div>
                     {/* Detalles de la Película */}
                     <div className="flex-1 flex flex-col justify-center">
-                        <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">{movie.title}</h1>
+                        {/* Título y estado de estreno */}
+                        <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">
+                            {movie.title}
+                            {isUpcoming && (
+                                <span className="block text-xl font-medium text-green-400 mt-2">{upcomingReleaseText}</span>
+                            )}
+                        </h1>
                         <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
                             <span className="font-semibold text-lg">{movie.duration}</span>
                             <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">{movie.genre}</span>
@@ -236,13 +286,20 @@ export default function MovieDetailPage() {
                 </div>
 
                 <div className="mt-12">
-                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">Horarios Disponibles</h2>
+                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">
+                        {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
+                    </h2>
                     {showtimes.length === 0 ? (
-                        <p className="text-gray-400">No hay funciones disponibles para esta película.</p>
+                        <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para esta película."}</p>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {showtimes.map((show) => (
-                                <MovieShowtimeCard key={show.id} show={show} movieSlug={movie.slug} />
+                                <MovieShowtimeCard 
+                                    key={show.id} 
+                                    show={show} 
+                                    movieSlug={movie.slug} 
+                                    isUpcoming={isUpcoming} 
+                                />
                             ))}
                         </div>
                     )}
@@ -252,8 +309,16 @@ export default function MovieDetailPage() {
     );
 }
 
-function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: string }) {
+// ==========================================================
+// COMPONENTE SECUNDARIO
+// ==========================================================
+
+// ACTUALIZADO: Acepta la bandera isUpcoming
+function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; movieSlug: string; isUpcoming?: boolean }) {
     const router = useRouter();
+
+    // Lógica para cambiar el botón
+    const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
         const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
@@ -262,11 +327,15 @@ function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: str
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
-            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p>
+            {/* Si es estreno, muestra la fecha completa, si no, solo la hora */}
+            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
             <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
-                <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">Comprar</button>
+                {/* Botón modificado para usar el texto condicional */}
+                <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
+                    {buttonText}
+                </button>
             </div>
         </div>
     );
