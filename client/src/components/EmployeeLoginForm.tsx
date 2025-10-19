@@ -1,6 +1,7 @@
 "use client";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE, TOKEN_KEY } from "@/lib/config";
 
 interface Props {
   userType: "admin" | "colaborador";
@@ -18,7 +19,7 @@ export default function EmployeeLoginForm({ userType }: Props) {
     setLoading(true);
     setError("");
     try {
-      const endpoint = userType === "admin" ? "http://localhost:5000/api/auth/login-admin" : "http://localhost:5000/api/auth/login-colaborador";
+  const endpoint = userType === "admin" ? `${API_BASE}/api/auth/login-admin` : `${API_BASE}/api/auth/login-colaborador`;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,10 +31,10 @@ export default function EmployeeLoginForm({ userType }: Props) {
         setLoading(false);
         return;
       }
-      localStorage.setItem("authToken", data.token);
+  localStorage.setItem(TOKEN_KEY, data.token);
       // Redirect to welcome page
       router.push("/welcome");
-    } catch (err) {
+    } catch {
       setError("Error de conexión. Verifica que el backend esté ejecutándose.");
     } finally {
       setLoading(false);

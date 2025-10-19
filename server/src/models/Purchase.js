@@ -7,7 +7,7 @@ const purchaseSchema = new mongoose.Schema(
     seats: [{ type: String, required: true }],
     totalPrice: { type: Number, required: true },
     status: { type: String, enum: ['reserved', 'paid', 'cancelled'], default: 'reserved' },
-    paymentInfo: { type: Object },
+  paymentInfo: { type: Object, select: false },
   },
   { timestamps: true }
 );

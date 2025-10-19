@@ -5,18 +5,21 @@ exports.list = async (req, res) => {
     const movies = await Movie.find({ isActive: true }).sort({ createdAt: -1 }).lean();
     res.json(movies);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('movieController.list error:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
 exports.getBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
+    if (!slug) return res.status(400).json({ message: 'Slug es requerido' });
     const movie = await Movie.findOne({ slug }).lean();
     if (!movie) return res.status(404).json({ message: 'Película no encontrada' });
     res.json(movie);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('movieController.getBySlug error:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
 
@@ -30,7 +33,8 @@ exports.create = async (req, res) => {
     const movie = await Movie.create(payload);
     res.status(201).json(movie);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('movieController.create error:', err);
+    res.status(400).json({ message: 'Datos inválidos para crear película' });
   }
 };
 
@@ -41,7 +45,8 @@ exports.update = async (req, res) => {
     if (!updated) return res.status(404).json({ message: 'Película no encontrada' });
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('movieController.update error:', err);
+    res.status(400).json({ message: 'Datos inválidos para actualizar película' });
   }
 };
 
@@ -51,6 +56,7 @@ exports.remove = async (req, res) => {
     await Movie.findByIdAndDelete(id);
     res.status(204).end();
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('movieController.remove error:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 };

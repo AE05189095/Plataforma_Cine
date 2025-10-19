@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE } from "@/lib/config";
 
 export default function RecoverPasswordPage() {
   const [email, setEmail] = useState("");
@@ -14,8 +15,8 @@ export default function RecoverPasswordPage() {
     setMessage("");
     try {
       // Verifica si el correo existe con GET
-      const verifyRes = await fetch(`http://localhost:5000/api/auth/recover-password?email=${encodeURIComponent(email)}`);
-      const verifyData = await verifyRes.json();
+  const verifyRes = await fetch(`${API_BASE}/api/auth/recover-password?email=${encodeURIComponent(email)}`);
+  await verifyRes.json();
       if (!verifyRes.ok) {
         if (verifyRes.status === 404) {
           setMessage("El correo ingresado no está registrado. Por favor verifica o crea una cuenta nueva.");
@@ -28,12 +29,12 @@ export default function RecoverPasswordPage() {
         return;
       }
       // Si existe, procede con el POST para recuperación
-      const res = await fetch("http://localhost:5000/api/auth/recover-password", {
+      const res = await fetch(`${API_BASE}/api/auth/recover-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      await res.json();
       if (res.ok) {
         setMessage("¡Correo de recuperación enviado! Revisa tu bandeja de entrada y la carpeta de spam.");
       } else if (res.status === 404) {

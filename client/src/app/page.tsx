@@ -2,8 +2,20 @@
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import MovieCard from "@/components/MovieCard";
+import Header from "@/components/Header";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+
+interface RawMovie {
+  title?: string;
+  posterUrl?: string;
+  images?: unknown[];
+  rating?: number | string;
+  ratingCount?: number;
+  genres?: string[];
+  releaseDate?: string;
+  duration?: number | string;
+  description?: string;
+}
 
 interface MovieData {
   title: string;
@@ -24,85 +36,8 @@ const ALL_GENRES = [
   "Ciencia Ficción",
 ];
 
-const MOVIES_CARTELERA: MovieData[] = [
-  {
-    title: "Otro Viernes de Locos",
-    image: "/images/otro-viernes-de-locos.jpg",
-    rating: "PG-13",
-    score: "7.8",
-    genre: "Comedia",
-    releaseDate: "2024-12-10",
-    duration: "110 min",
-    description:
-      "Años después de que Tess y Anna sufrieran una crisis de identidad, Anna ahora tiene una hija y una hijastra. Enfrentan los desafíos que se presentan cuando dos familias se fusionan. Tess y Anna descubren que un rayo puede caer dos veces.",
-  },
-  {
-    title: "Quantum Nexus",
-    image: "/images/movie1.jpg",
-    rating: "PG-13",
-    score: "8.5",
-    genre: "Ciencia Ficción",
-    releaseDate: "2024-11-15",
-    duration: "135 min",
-    description:
-      "Un físico viaja a través de dimensiones cuánticas para salvar el futuro de la humanidad.",
-  },
-  {
-    title: "Echoes of Tomorrow",
-    image: "/images/movie2.jpg",
-    rating: "R",
-    score: "8.5",
-    genre: "Drama",
-    releaseDate: "2024-11-01",
-    duration: "110 min",
-    description:
-      "Una emotiva historia sobre la pérdida y la búsqueda de segundas oportunidades en un mundo post-apocalíptico.",
-  },
-  {
-    title: "Midnight Heist",
-    image: "/images/movie3.jpg",
-    rating: "PG-13",
-    score: "8.5",
-    genre: "Acción",
-    releaseDate: "2024-11-22",
-    duration: "98 min",
-    description:
-      "Un equipo de élite intenta el robo más grande de la historia durante un apagón total en la ciudad.",
-  },
-  {
-    title: "Death Unicorn",
-    image: "/images/movie4.jpg",
-    rating: "R",
-    score: "9.2",
-    genre: "Ciencia Ficción",
-    releaseDate: "2024-12-05",
-    duration: "145 min",
-    description:
-      "Una criatura mítica desata el caos en un laboratorio futurista, forzando a los científicos a luchar por su vida.",
-  },
-  {
-    title: "Warfare",
-    image: "/images/movie5.jpg",
-    rating: "PG-13",
-    score: "9.1",
-    genre: "Acción",
-    releaseDate: "2024-10-10",
-    duration: "120 min",
-    description:
-      "El enfrentamiento final entre dos ejércitos de élite en una batalla épica por el control de un recurso vital.",
-  },
-  {
-    title: "Fast Lane Fury",
-    image: "/images/movie6.jpg",
-    rating: "PG-13",
-    score: "7.8",
-    genre: "Acción",
-    releaseDate: "2024-11-29",
-    duration: "105 min",
-    description:
-      "Una carrera de coches ilegal se convierte en una peligrosa persecución internacional por la supervivencia.",
-  },
-];
+// Inicial vacío: cargaremos la lista desde la API
+const MOVIES_CARTELERA: MovieData[] = [];
 
 const NUM_CLICKS_TO_ACTIVATE = 8;
 const TIMEOUT_DURATION = 1500;
@@ -112,6 +47,7 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState(ALL_GENRES[0]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [movies, setMovies] = useState<MovieData[]>(MOVIES_CARTELERA);
   const [logoClickCount, setLogoClickCount] = useState(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -120,6 +56,73 @@ export default function HomePage() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
+  }, []);
+
+  // Cargar películas desde la API del servidor
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      // Usar variable de entorno NEXT_PUBLIC_API_URL si está definida, si no, fallback a localhost:5000
+      const API_BASE = (process.env.NEXT_PUBLIC_API_URL as string) || 'http://localhost:5000';
+
+      // Helper para obtener una URL de imagen tipo string
+      const getImage = (m: RawMovie): string => {
+        if (typeof m.posterUrl === 'string') return m.posterUrl;
+        if (Array.isArray(m.images) && m.images.length) {
+            const first = m.images[0];
+            if (typeof first === 'string') return first;
+            if (first && typeof first === 'object' && 'url' in first && typeof (first as Record<string, unknown>).url === 'string') return (first as Record<string, unknown>).url as string;
+        }
+        return '/images/movie-default.svg';
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/movies`);
+        if (!res.ok) throw new Error('Error al obtener películas');
+        const data = await res.json();
+
+        // Mapear los campos del backend a MovieData para MovieCard
+        const mapped: MovieData[] = (data as unknown as RawMovie[]).map((m) => ({
+          title: m.title || 'Sin título',
+          image: getImage(m),
+          rating: m.rating && String(m.rating).length > 0 ? String(m.rating) : 'PG-13',
+          score: m.rating ? String(m.rating) : (m.ratingCount ? String(m.ratingCount) : 'N/A'),
+          genre: Array.isArray(m.genres) && m.genres.length ? m.genres[0] : 'General',
+          releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0,10) : '',
+          duration: m.duration ? `${m.duration} min` : 'N/A',
+          description: m.description || '',
+        }));
+
+        if (mounted) setMovies(mapped);
+      } catch (err) {
+        console.warn('Error al obtener películas desde', `${API_BASE}/api/movies`, err);
+        // Intentar fallback relativo (si el backend está servido por el mismo host o hay proxy)
+        try {
+          const res2 = await fetch('/api/movies');
+          if (res2.ok) {
+            const data2 = await res2.json();
+            const mapped2: MovieData[] = (data2 as unknown as RawMovie[]).map((m) => ({
+              title: m.title || 'Sin título',
+              image: getImage(m),
+              rating: m.rating && String(m.rating).length > 0 ? String(m.rating) : 'PG-13',
+              score: m.rating ? String(m.rating) : (m.ratingCount ? String(m.ratingCount) : 'N/A'),
+              genre: Array.isArray(m.genres) && m.genres.length ? m.genres[0] : 'General',
+              releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0,10) : '',
+              duration: m.duration ? `${m.duration} min` : 'N/A',
+              description: m.description || '',
+            }));
+            if (mounted) setMovies(mapped2);
+            return;
+          }
+        } catch (err2) {
+          console.error('Fallback relativo falló', err2);
+        }
+        console.error('Error al obtener películas', err);
+      }
+    }
+
+    load();
+    return () => { mounted = false; };
   }, []);
 
   // Redirigir al modo admin cuando se alcance el número de clics
@@ -131,7 +134,7 @@ export default function HomePage() {
   }, [logoClickCount, router]);
 
   const filteredMovies = useMemo(() => {
-    let current = MOVIES_CARTELERA;
+    let current = movies;
     if (searchTerm)
       current = current.filter((m) =>
         m.title.toLowerCase().includes(searchTerm.toLowerCase())
@@ -141,7 +144,7 @@ export default function HomePage() {
     if (selectedDate)
       current = current.filter((m) => m.releaseDate >= selectedDate);
     return current;
-  }, [searchTerm, selectedGenre, selectedDate]);
+  }, [movies, searchTerm, selectedGenre, selectedDate]);
 
   const handleLogoClick = () => {
     setLogoClickCount((prev) => {
@@ -159,54 +162,15 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
-      <header className="bg-gray-900 text-white p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div
-          className="flex-shrink-0 bg-transparent cursor-pointer"
-          onClick={handleLogoClick}
-        >
-          <Image
-            src="/images/Logo.png"
-            alt="Logo CineGT"
-            width={160}
-            height={60}
-            priority
-          />
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-center w-full md:w-auto">
-          <input
-            type="text"
-            placeholder="Buscar película"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="px-3 py-2 rounded border-2 border-red-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
-          />
-          <select
-            value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
-            className="px-3 py-2 rounded border-2 border-red-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-600 cursor-pointer"
-          >
-            {ALL_GENRES.map((genre) => (
-              <option key={genre} value={genre}>
-                {genre}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 rounded border-2 border-red-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-600 cursor-pointer"
-          />
-
-          <button
-            onClick={() => router.push("/login")}
-            className="px-4 py-2 bg-red-600 rounded hover:bg-red-700 transition"
-          >
-            Iniciar sesión
-          </button>
-        </div>
-      </header>
+      <Header
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        selectedGenre={selectedGenre}
+        setSelectedGenre={setSelectedGenre}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        onLogoClick={handleLogoClick}
+      />
 
       <main className="container mx-auto p-4 sm:p-8">
         <section className="text-center pt-10 pb-16">
@@ -226,7 +190,7 @@ export default function HomePage() {
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
           {filteredMovies.length > 0 ? (
             filteredMovies.map((movie, index) => (
-              <MovieCard key={index} {...movie} />
+              <MovieCard key={movie.title + index} {...movie} />
             ))
           ) : (
             <p className="col-span-full text-center text-xl text-gray-400">

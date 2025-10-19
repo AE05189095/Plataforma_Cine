@@ -4,6 +4,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { API_BASE } from "@/lib/config";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function RegisterPage() {
     
     //configuracion al backend 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
@@ -61,7 +62,7 @@ export default function RegisterPage() {
 
       // Espera un par de segundos antes de redirigir
       setTimeout(() => router.push("/login"), 2000);
-    } catch (err) {
+    } catch {
       setError(
         "Error de conexión. Asegúrate de que el servidor Express esté encendido (Puerto 5000)."
       );
