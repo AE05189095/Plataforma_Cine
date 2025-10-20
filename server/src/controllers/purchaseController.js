@@ -1,24 +1,19 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
-const crypto = require('crypto'); // o usa uuid si prefieres
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const sendConfirmationEmail = require('../utils/sendConfirmationEmail'); // asegúrate de tener esta función lista
 
-const generateConfirmationCode = () => crypto.randomBytes(4).toString('hex').toUpperCase();
-
+// Crear una compra (reserva) y bloquear asientos
 exports.create = async (req, res) => {
   const session = await Showtime.startSession();
   try {
+    // userId preferido desde token (auth middleware)
     const userId = req.userId || req.body.userId;
     const { showtimeId, paymentInfo } = req.body;
     let { seats } = req.body;
-
     if (!userId || !showtimeId || !Array.isArray(seats) || seats.length === 0) {
       return res.status(400).json({ message: 'Datos incompletos' });
     }
 
+    // Normalizar asientos
     seats = seats.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
     seats = Array.from(new Set(seats));
 
@@ -26,16 +21,22 @@ exports.create = async (req, res) => {
     let updatedShowtime = null;
 
     await session.withTransaction(async () => {
+      // Intentar reservar los asientos de forma atómica
       const st = await Showtime.findOneAndUpdate(
         { _id: showtimeId, seatsBooked: { $nin: seats } },
         { $push: { seatsBooked: { $each: seats } } },
         { new: true, session }
-      ).populate('hall').populate('movie'); // <- Asegúrate de tener movie
+      ).populate('hall');
 
-      if (!st) throw { status: 409, message: 'Alguno de los asientos ya está reservado' };
+      if (!st) {
+        // Abortar la transacción lanzando error
+        throw { status: 409, message: 'Alguno de los asientos ya está reservado' };
+      }
 
+      // Calcular total según precio del showtime
       const totalPrice = (st.price || 0) * seats.length;
 
+      // Sanitizar paymentInfo: mantener solo campos no sensibles
       let safePayment = {};
       try {
         if (paymentInfo && typeof paymentInfo === 'object') {
@@ -60,52 +61,15 @@ exports.create = async (req, res) => {
         safePayment = {};
       }
 
-      const confirmationCode = generateConfirmationCode();
-
-      createdPurchase = await Purchase.create(
-        [{
-          user: userId,
-          showtime: showtimeId,
-          seats,
-          totalPrice,
-          status: 'reserved',
-          paymentInfo: safePayment,
-          confirmationCode,
-          emailSent: false
-        }],
-        { session }
-      );
-
+      createdPurchase = await Purchase.create([{ user: userId, showtime: showtimeId, seats, totalPrice, status: 'reserved', paymentInfo: safePayment }], { session });
+      // createdPurchase es un array cuando usamos create([...], {session})
       createdPurchase = Array.isArray(createdPurchase) ? createdPurchase[0] : createdPurchase;
+
+      // obtener showtime actualizado (no lean) y poblar movie/hall fuera de la transacción para evitar problemas
       updatedShowtime = st;
     });
 
-    // Enviar correo una vez fuera de la transacción
-    try {
-      const user = req.user || {};
-      const userEmail = user.email || req.body.userEmail;
-      const movie = updatedShowtime.movie?.title || 'Película';
-      const room = updatedShowtime.hall?.name || 'Sala';
-      const date = updatedShowtime.date?.toLocaleDateString() || '';
-      const time = updatedShowtime.time || '';
-      const seatList = seats.join(', ');
-      const code = createdPurchase.confirmationCode;
-
-      await sendConfirmationEmail(userEmail, {
-        movie,
-        date,
-        time,
-        room,
-        seat: seatList,
-        code
-      });
-
-      createdPurchase.emailSent = true;
-      await createdPurchase.save();
-    } catch (err) {
-      console.error('Error al enviar el correo de confirmación:', err);
-    }
-
+    // Obtener showtime con populate y ordenar seatsBooked antes de responder
     const fresh = await Showtime.findById(showtimeId).populate('movie').populate('hall').lean();
     const seatsArr = Array.isArray(fresh.seatsBooked) ? fresh.seatsBooked.slice() : [];
     seatsArr.sort((a, b) => {
@@ -123,7 +87,7 @@ exports.create = async (req, res) => {
       purchase: createdPurchase,
       showtime: { ...fresh, seatsBooked: seatsArr, availableSeats: Math.max(0, capacity - seatsArr.length) },
     });
-
+    // Emitir evento showtimeUpdated
     try {
       const io = req.app.locals.io;
       if (io) io.emit('showtimeUpdated', { _id: fresh._id, seatsBooked: seatsArr, availableSeats: Math.max(0, capacity - seatsArr.length) });
@@ -138,3 +102,13 @@ exports.create = async (req, res) => {
   }
 };
 
+// Obtener compras de un usuario
+exports.listByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const purchases = await Purchase.find({ user: userId }).populate('showtime').lean();
+    res.json(purchases);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
