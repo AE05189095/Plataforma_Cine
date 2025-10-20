@@ -1,8 +1,7 @@
 // backend/controllers/showtimeController.js
 const Showtime = require('../models/Showtime');
-// 🛑 CORRECCIÓN: Importar los modelos necesarios para que Mongoose los registre (populate).
 const Movie = require('../models/Movie'); 
-const Hall = require('../models/Hall');   
+const Hall = require('../models/Hall');   
 const mongoose = require('mongoose'); 
 
 // Duración del bloqueo en minutos
@@ -11,7 +10,7 @@ const LOCK_DURATION_MINUTES = 10;
 /**
  * Función auxiliar para obtener todos los asientos bloqueados y asientosBooked del showtime
  * @param {Object} showtime - El documento Showtime (puede ser lean).
- * @param {string} currentUserId - El ID del usuario actual.
+ * @param {string | null} currentUserId - El ID del usuario actual. Si es null, devuelve todos los locks activos.
  * @returns {{seatsLocked: string[], userLockedSeats: string[]}}
  */
 const getLockedSeats = (showtime, currentUserId) => {
@@ -23,7 +22,7 @@ const getLockedSeats = (showtime, currentUserId) => {
     const activeLocks = (showtime.seatsLocks || []).filter(lock => lock.expiresAt > now);
     
     for (const lock of activeLocks) {
-        // Excluir los asientos que ya están permanentemente ocupados/booked con defensividad
+        // Excluir los asientos que ya están permanentemente ocupados/booked
         const validSeats = (lock.seats || []).filter(seat => !(showtime.seatsBooked || []).includes(seat));
         
         allLockedSeats.push(...validSeats);
@@ -37,7 +36,7 @@ const getLockedSeats = (showtime, currentUserId) => {
     // Eliminar duplicados
     allLockedSeats = Array.from(new Set(allLockedSeats));
 
-    return { seatsLocked: allLockedSeats, userLockedSeats: userLockedSeats };
+    return { seatsLocked: allLockedSeats, userLockedSeats: Array.from(new Set(userLockedSeats)) };
 };
 
 
@@ -57,14 +56,15 @@ const sortSeats = (seats) => {
     });
 };
 
-// 🛑 CORRECCIÓN PRINCIPAL para el error 500 sin movieId
+// ==========================================================
+// LISTAR Y OBTENER FUNCIONES
+// ==========================================================
+
 exports.list = async (req, res) => {
     try {
         const { movieId } = req.query; 
         let filter = { isActive: true };
         
-        // Seguridad CRÍTICA: Solo crea el ObjectId si el parámetro existe Y es un formato válido.
-        // Esto previene el error 500 cuando se llama a /api/showtimes sin parámetros.
         if (movieId && mongoose.isValidObjectId(movieId)) { 
             filter.movie = new mongoose.Types.ObjectId(movieId); 
         }
@@ -78,14 +78,12 @@ exports.list = async (req, res) => {
         const withAvailability = showtimes.map((st) => {
             const seats = Array.isArray(st.seatsBooked) ? st.seatsBooked.slice() : [];
             sortSeats(seats);
-            // Defensividad para la capacidad
             const capacity = st.hall && st.hall.capacity ? Number(st.hall.capacity) : 0;
             return { ...st, seatsBooked: seats, availableSeats: Math.max(0, capacity - seats.length) };
         });
         
         res.json(withAvailability);
     } catch (err) {
-        // Muestra la traza de error completa en la consola del Backend
         console.error('showtimeController.list CRITICAL ERROR:', err); 
         res.status(500).json({ message: 'Error interno del servidor al listar horarios' });
     }
@@ -94,11 +92,14 @@ exports.list = async (req, res) => {
 exports.get = async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // 🛑 VALIDACIÓN DE ID
+        if (!id || !mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ message: 'ID de showtime inválido o no proporcionado.' });
+        }
+        
         const userId = req.user ? req.user._id : null; 
         
-        if (!id) return res.status(400).json({ message: 'ID es requerido' });
-        
-        // Populate Hall es vital para obtener la capacidad
         const showtime = await Showtime.findById(id).populate('movie').populate('hall').lean();
         
         if (!showtime) return res.status(404).json({ message: 'Función no encontrada' });
@@ -115,8 +116,8 @@ exports.get = async (req, res) => {
         
         res.json({ 
             ...showtime, 
-            seatsBooked: booked, // Vendidos permanentemente
-            seatsLocked: seatsLocked, // Bloqueados temporalmente por otros
+            seatsBooked: booked, 
+            seatsLocked: seatsLocked, 
             availableSeats: Math.max(0, capacity - allOccupiedSeats.length) 
         });
     } catch (err) {
@@ -125,56 +126,86 @@ exports.get = async (req, res) => {
     }
 };
 
-// 🛑 ENDPOINT: Maneja el bloqueo temporal de asientos
+// ==========================================================
+// BLOQUEO DE ASIENTOS (CORRECCIÓN CRÍTICA)
+// ==========================================================
+
+// 🛑 ENDPOINT: Maneja el bloqueo temporal de asientos (CORREGIDO CON PULL/PUSH SEPARADO)
 exports.lockSeats = async (req, res) => {
     if (!req.user || !req.user._id) return res.status(401).json({ message: 'No autenticado' });
 
     const showtimeId = req.params.id;
+    
+    // 🛑 VALIDACIÓN DE ID
+    if (!showtimeId || !mongoose.isValidObjectId(showtimeId)) {
+        return res.status(400).json({ message: 'ID de showtime inválido o no proporcionado.' });
+    }
+    
     const userId = req.user._id;
-    let seatIds = req.body.seatIds || [];
+    let seatIds = req.body.seatIds || []; 
 
     if (!Array.isArray(seatIds)) seatIds = [];
-
-    seatIds = seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean);
-    seatIds = Array.from(new Set(seatIds));
-
+    seatIds = Array.from(new Set(seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)));
+    
     try {
-        const showtime = await Showtime.findById(showtimeId);
-        if (!showtime) return res.status(404).json({ message: 'Función no encontrada' });
+        const showtimeDoc = await Showtime.findById(showtimeId).lean();
+        if (!showtimeDoc) return res.status(404).json({ message: 'Función no encontrada' });
 
-        const booked = showtime.seatsBooked || [];
-        // Al pasar el userId a getLockedSeats, obtenemos los bloqueos de TODOS EXCEPTO del usuario actual
-        const { seatsLocked: currentlyLockedByOthers } = getLockedSeats(showtime.toObject(), userId);
+        const booked = showtimeDoc.seatsBooked || [];
+        
+        // 1. Obtener los locks activos para validar disponibilidad
+        const { seatsLocked: allActiveLocks } = getLockedSeats(showtimeDoc, null); 
+        const currentUserLocks = (showtimeDoc.seatsLocks || []).find(lock => lock.userId && lock.userId.toString() === userId.toString());
+            
+        // Los asientos que están bloqueados por OTRAS personas
+        const currentlyLockedByOthers = Array.from(new Set(
+            allActiveLocks.filter(seat => !(currentUserLocks && currentUserLocks.seats.includes(seat)))
+        ));
         
         const unavailable = Array.from(new Set([...booked, ...currentlyLockedByOthers]));
 
+        // Los asientos que el usuario QUIERE y que están realmente DISPONIBLES.
         const validSeatsToLock = seatIds.filter(seat => !unavailable.includes(seat));
         
         const newExpirationTime = new Date(Date.now() + LOCK_DURATION_MINUTES * 60000);
+
+        // 2. Operación de Limpieza (PULL): Siempre se ejecuta primero y es atómica
+        const pullOperation = {
+            $pull: { seatsLocks: { userId: new mongoose.Types.ObjectId(userId) } }
+        };
+        await Showtime.findByIdAndUpdate(showtimeId, pullOperation);
         
-        let userLockIndex = showtime.seatsLocks.findIndex(lock => lock.userId.toString() === userId.toString());
+        let updatedShowtime;
 
         if (validSeatsToLock.length > 0) {
-            if (userLockIndex !== -1) {
-                showtime.seatsLocks[userLockIndex].seats = validSeatsToLock;
-                showtime.seatsLocks[userLockIndex].expiresAt = newExpirationTime;
-            } else {
-                showtime.seatsLocks.push({
-                    userId: new mongoose.Types.ObjectId(userId),
-                    seats: validSeatsToLock,
-                    expiresAt: newExpirationTime,
-                });
-            }
-        } else if (userLockIndex !== -1) {
-            // Si no se seleccionaron asientos válidos, eliminar el bloqueo existente
-            showtime.seatsLocks.splice(userLockIndex, 1);
+            // 3. Operación de Inserción (PUSH): Se ejecuta solo si hay asientos válidos
+            const pushOperation = {
+                $push: {
+                    seatsLocks: {
+                        userId: new mongoose.Types.ObjectId(userId),
+                        seats: validSeatsToLock,
+                        expiresAt: newExpirationTime,
+                    }
+                }
+            };
+            
+            updatedShowtime = await Showtime.findByIdAndUpdate(
+                showtimeId,
+                pushOperation,
+                { new: true } // Obtener el documento actualizado
+            );
+        } else {
+            // Si no hay asientos válidos, solo obtenemos el documento tras el PULL
+            updatedShowtime = await Showtime.findById(showtimeId);
         }
-
-        await showtime.save();
         
-        // Recalcular asientos bloqueados globalmente para la respuesta y el socket
-        const { seatsLocked: finalLockedSeats, userLockedSeats: finalUserLockedSeats } = getLockedSeats(showtime.toObject(), userId);
+        
+        if (!updatedShowtime) return res.status(404).json({ message: 'Función no encontrada después de actualizar' });
 
+        // 4. Recalcular asientos bloqueados del documento actualizado para la respuesta
+        const { seatsLocked: finalLockedSeats, userLockedSeats: finalUserLockedSeats } = getLockedSeats(updatedShowtime.toObject(), userId);
+
+        // 5. Emisión de Socket
         try {
             const io = req.app.locals.io;
             if (io) io.to(showtimeId).emit('seatsLocked', { showtimeId, seats: finalLockedSeats });
@@ -182,29 +213,39 @@ exports.lockSeats = async (req, res) => {
             console.error('Error emitiendo seatsLocked:', e);
         }
 
-        res.json({
+        // 6. Respuesta al cliente
+        return res.json({
             msg: 'Bloqueo actualizado',
             lockedSeats: finalLockedSeats,
-            userLockedSeats: finalUserLockedSeats,
+            userLockedSeats: finalUserLockedSeats, 
             expirationTime: finalUserLockedSeats.length > 0 ? newExpirationTime.toISOString() : null,
         });
 
     } catch (err) {
-        console.error('showtimeController.lockSeats error:', err);
-        res.status(500).json({ message: 'Error interno del servidor' });
+        console.error('showtimeController.lockSeats CRITICAL ERROR:', err);
+        return res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
+
+// ==========================================================
+// RESERVA DE ASIENTOS
+// ==========================================================
 
 exports.reserveSeats = async (req, res) => {
     try {
         const { id } = req.params;
+        
+        // 🛑 VALIDACIÓN DE ID
+        if (!id || !mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ message: 'ID de showtime inválido o no proporcionado.' });
+        }
+        
         const userId = req.user ? req.user._id : null;
         let { seats } = req.body;
 
         seats = seats.map((s) => String(s).trim().toUpperCase()).filter(Boolean);
         seats = Array.from(new Set(seats));
 
-        // 1. Intentar la reserva atómica: solo si los asientos no están ya en seatsBooked
         const updated = await Showtime.findOneAndUpdate(
             { _id: id, seatsBooked: { $nin: seats } },
             { $push: { seatsBooked: { $each: seats } } },
@@ -214,9 +255,8 @@ exports.reserveSeats = async (req, res) => {
         .populate('hall')
         .lean();
 
-        if (!updated) return res.status(409).json({ message: 'Alguno de los asientos ya está reservado o bloqueado.' });
+        if (!updated) return res.status(409).json({ message: 'Alguno de los asientos ya está reservado.' });
         
-        // 2. Limpiar el bloqueo del usuario tras la reserva exitosa
         const finalShowtime = await Showtime.findById(id);
 
         if (finalShowtime && userId) { 
@@ -227,7 +267,6 @@ exports.reserveSeats = async (req, res) => {
              }
         }
         
-        // 3. Respuesta y emisión de socket
         const seatsArr = Array.isArray(updated.seatsBooked) ? updated.seatsBooked.slice() : [];
         sortSeats(seatsArr);
 
