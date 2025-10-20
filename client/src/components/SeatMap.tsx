@@ -11,6 +11,8 @@ type Props = {
     selectedSeats: string[];
     currentSelectedObjects: Seat[];
     onSelectionChange?: (selected: Seat[]) => void;
+    // 🛑 Asegúrate de que esta prop esté aquí
+    onMaxSelectionAttempt?: () => void; 
 };
 
 const MAX_SEATS = 10;
@@ -23,6 +25,7 @@ export default function SeatMap({
     selectedSeats = [],
     currentSelectedObjects = [],
     onSelectionChange,
+    onMaxSelectionAttempt 
 }: Props) {
     
     const makeSeat = useCallback((row: string, num: number): Seat => {
@@ -46,7 +49,7 @@ export default function SeatMap({
         const baseClass = "w-12 h-12 rounded flex items-center justify-center text-sm font-medium border shadow-sm transition-colors duration-200";
 
         if (isSelected) {
-            return `${baseClass} bg-green-500 text-white border-green-500 hover:bg-green-600 ring-2 ring-green-300`;
+            return `${baseClass} bg-green-500 text-white border-green-500 border-2 ring-2 ring-green-300`;
         }
         
         switch (status) {
@@ -69,22 +72,19 @@ export default function SeatMap({
         let newSelected: Seat[];
 
         if (isCurrentlySelected) {
-            // Caso 1: Deseleccionar el asiento (siempre permitido)
             newSelected = currentSelectedObjects.filter(s => s.id !== seat.id);
         } else {
-            // Caso 2: Seleccionar un asiento
-
-            // CRÍTICO: Prevenimos la selección visual y la llamada al padre si se excede el límite.
+            // Lógica de Límite
             if (currentSelectedObjects.length >= MAX_SEATS) {
-                // El componente padre (page.tsx) se encargará de mostrar el Toast
-                return;
+                if (onMaxSelectionAttempt) {
+                    onMaxSelectionAttempt(); // Notificar al padre
+                }
+                return; // Prevenir la selección
             }
             
-            // Añadir el nuevo asiento
             newSelected = [...currentSelectedObjects, seat];
         }
         
-        // Llamar al padre si hay un cambio válido (<= 10 asientos).
         if (onSelectionChange) {
             onSelectionChange(newSelected);
         }
@@ -98,7 +98,6 @@ export default function SeatMap({
                 </div>
             </div>
 
-            {/* Contador de asientos seleccionados */}
             <div className="mb-4 text-center">
                 <div className="text-white font-semibold">
                     Asientos seleccionados: {currentSelectedObjects.length} / {MAX_SEATS}

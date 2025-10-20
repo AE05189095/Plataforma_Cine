@@ -29,9 +29,7 @@ const MAX_SEATS = 10;
 export default function ComprarPage() {
   const router = useRouter();
   
-  // ESTADO CONFIRMADO (Por servidor y resumen de compra)
   const [selected, setSelected] = useState<Seat[]>([]); 
-  // ESTADO PENDIENTE (Lo que el usuario ve en la UI)
   const [pendingSelection, setPendingSelection] = useState<Seat[]>([]); 
   
   const [occupied, setOccupied] = useState<string[]>([]);
@@ -53,21 +51,29 @@ export default function ComprarPage() {
         headers: { 'Authorization': token ? `Bearer ${token}` : '' }
       });
       
-      if (!res.ok) throw new Error('No se pudo obtener showtime');
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({ message: 'Error de red o backend desconocido' }));
+        console.error("Fetch Showtime Failed:", res.status, errorBody);
+        throw new Error(errorBody.message || 'No se pudo obtener showtime');
+      }
+
       const data: ShowtimeResponse = await res.json();
       setShowtime(data);
       setOccupied(data.seatsBooked || []);
       setReserved(data.seatsLocked || []); 
       
-    } catch (err) {
+    } catch (err: unknown) { // 🛑 Corrección: Usar unknown
       console.error(err);
-      setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
+      let errorMessage = 'Error al cargar la información de la función';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      setToast({ open: true, message: errorMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
   }, [showtimeId]);
   
-  // LÓGICA DE BLOQUEO DE ASIENTOS EN EL SERVIDOR
   const updateSeatLocks = useCallback(async (seatsToLock: Seat[]) => {
     if (!showtimeId) return;
 
@@ -98,11 +104,8 @@ export default function ComprarPage() {
         if (data.userLockedSeats) {
           const successfullyLockedSeats = seatsToLock.filter(s => data.userLockedSeats.includes(s.id));
           
-          // CRÍTICO 1: Actualizamos el estado CONFIRMADO (selected) con lo que el servidor confirmó.
           setSelected(successfullyLockedSeats); 
           
-          // CRÍTICO 2: Solo ajustamos el estado de la UI (pendingSelection) si el servidor 
-          // confirmó una cantidad diferente (ej. menos) de asientos, o si la lista estaba vacía.
           if (successfullyLockedSeats.length !== seatsToLock.length || seatsToLock.length === 0) {
             setPendingSelection(successfullyLockedSeats);
             if (seatsToLock.length > 0) {
@@ -113,11 +116,8 @@ export default function ComprarPage() {
                 });
             }
           }
-          // Si el servidor confirma todos los asientos (lengths son iguales), 
-          // pendingSelection se mantiene como está (evitando parpadeo).
           
         } else {
-          // Si no hay userLockedSeats en la respuesta (caso inusual), asumimos lo enviado y sincronizamos.
           setSelected(seatsToLock);
           setPendingSelection(seatsToLock); 
         }
@@ -135,10 +135,9 @@ export default function ComprarPage() {
           position: 'center' 
         });
         
-        // CRÍTICO 3: En caso de error, revertir PENDIENTE a SELECTED (último estado VÁLIDO).
         setPendingSelection(selected);
       }
-    } catch (error) {
+    } catch (error: unknown) { // 🛑 Corrección: Usar unknown
       console.error(error);
       setToast({ 
         open: true, 
@@ -147,32 +146,25 @@ export default function ComprarPage() {
         position: 'top-right' 
       });
       
-      // CRÍTICO 4: En caso de fallo de conexión, revertir PENDIENTE a SELECTED.
       setPendingSelection(selected);
     }
   }, [showtimeId, router, selected]);
 
-  // MANEJO DE SELECCIÓN ESTABLE Y CON LÍMITE
   const handleSelectionChange = useCallback((newSeats: Seat[]) => {
-    
-    // Si la lista excede el límite (el SeatMap solo llamó esto si el usuario deseleccionó o seleccionó hasta 10)
-    if (newSeats.length > MAX_SEATS) {
-        setToast({ 
-            open: true, 
-            message: `Máximo ${MAX_SEATS} asientos por compra`, 
-            type: 'error',
-            position: 'center'
-        });
-        return; 
-    }
-    
-    // Si la selección es válida (10 o menos), actualizamos la UI inmediatamente y llamamos al servidor.
     setPendingSelection(newSeats);
     updateSeatLocks(newSeats);
     
   }, [updateSeatLocks]);
 
-  // ... (Resto de efectos y lógica de la página, sin cambios)
+  const handleMaxSelectionAttempt = useCallback(() => {
+    setToast({ 
+        open: true, 
+        message: `Alcanzaste el máximo de compra (${MAX_SEATS} asientos)`, 
+        type: 'info', 
+        position: 'center'
+    });
+  }, []);
+
   useEffect(() => {
     if (selected.length > 0 && selected.length !== pendingSelection.length) {
         setPendingSelection(selected);
@@ -245,7 +237,7 @@ export default function ComprarPage() {
                 Límite: <span className="text-white font-semibold">{MAX_SEATS} asientos</span>
               </div>
             ) : (
-              <div className="text-slate-400 mb-4">Selecciona un horario para ver los asientos</div>
+              <div className="text-red-400 mb-4 font-semibold">Error al cargar la función. Revisa tu consola o la URL.</div>
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -256,6 +248,7 @@ export default function ComprarPage() {
                   selectedSeats={pendingSelection.map(s => s.id)} 
                   onSelectionChange={handleSelectionChange}
                   currentSelectedObjects={pendingSelection} 
+                  onMaxSelectionAttempt={handleMaxSelectionAttempt} 
                 />
               </div>
 
@@ -320,12 +313,15 @@ export default function ComprarPage() {
                     throw new Error(b.message || 'Error al crear compra');
                   }
                   const body = await res.json();
+                  
+                  // 🛑 Limpiar después de la compra exitosa
                   setOccupied(body.showtime?.seatsBooked || []);
                   setReserved([]); 
                   setSelected([]);
                   setPendingSelection([]);
                   setExpirationTime(null);
-                  setPaymentModal(null);
+                  setPaymentModal(null); // Cerrar modal
+                  
                   setToast({ 
                     open: true, 
                     message: 'Compra y reserva exitosa', 
