@@ -61,16 +61,36 @@ exports.create = async (req, res) => {
         safePayment = {};
       }
 
-      createdPurchase = await Purchase.create([{ user: userId, showtime: showtimeId, seats, totalPrice, status: 'reserved', paymentInfo: safePayment }], { session });
+      
+const confirmationCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+     createdPurchase = await Purchase.create([{
+  user: userId,
+  showtime: showtimeId,
+  seats,
+  totalPrice,
+  status: 'reserved',
+  paymentInfo: safePayment,
+  confirmationCode, // ← campo obligatorio
+  emailSent: false
+}], { session });
+
       // createdPurchase es un array cuando usamos create([...], {session})
       createdPurchase = Array.isArray(createdPurchase) ? createdPurchase[0] : createdPurchase;
 
       // obtener showtime actualizado (no lean) y poblar movie/hall fuera de la transacción para evitar problemas
       updatedShowtime = st;
     });
+        const fresh = await Showtime.findById(showtimeId).populate('movie').populate('hall').lean();
 
-    // Obtener showtime con populate y ordenar seatsBooked antes de responder
-    const fresh = await Showtime.findById(showtimeId).populate('movie').populate('hall').lean();
+        if (!fresh) {
+  return res.status(404).json({ message: 'Showtime no encontrado' });
+}
+
+const capacity = fresh.hall && fresh.hall.capacity ? Number(fresh.hall.capacity) : 0;
+    const nodemailer = require('nodemailer');
+
+     // Obtener showtime con populate y ordenar seatsBooked antes de responder
+    // const fresh = await Showtime.findById(showtimeId).populate('movie').populate('hall').lean();
     const seatsArr = Array.isArray(fresh.seatsBooked) ? fresh.seatsBooked.slice() : [];
     seatsArr.sort((a, b) => {
       const pa = /^([A-Za-z]+)(\d+)$/.exec(String(a));
@@ -81,7 +101,56 @@ exports.create = async (req, res) => {
       }
       return String(a).localeCompare(String(b));
     });
-    const capacity = fresh.hall && fresh.hall.capacity ? Number(fresh.hall.capacity) : 0;
+
+
+try {
+  const testAccount = await nodemailer.createTestAccount();
+
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass
+    }
+  });
+
+
+     
+
+  const info = await transporter.sendMail({
+    from: '"Plataforma Cine" <no-reply@cine.com>',
+    to: req.body.userEmail || 'ondina@example.com',
+    subject: 'Confirmación de compra - Plataforma Cine',
+    html: `
+        <div style="background-color:#0D1B2A; color:#F8F9FA; padding:20px; font-family:sans-serif;">
+        <h2 style="color:#F1C40F;">🎬 Confirmación de compra - CineGT</h2>
+        <p>Hola,</p>
+        <p>Gracias por tu compra. Aquí están los detalles:</p>
+        <ul style="list-style:none; padding:0;">
+          <li><strong>Película:</strong> ${fresh.movie.title}</li>
+          <li><strong>Fecha:</strong> ${new Date(fresh.startAt).toLocaleDateString('es-ES')}</li>
+          <li><strong>Hora:</strong> ${new Date(fresh.startAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })}</li>
+          <li><strong>Sala:</strong> ${fresh.hall.name}</li>
+          <li><strong>Asientos:</strong> ${seatsArr.join(', ')}</li>
+          <li><strong>Código de confirmación:</strong> <span style="color:#E63946;">${createdPurchase.confirmationCode}</span></li>
+        </ul>
+        <p>Nos vemos en el cine 🍿</p>
+      </div>
+      `
+
+
+  });
+
+  await Purchase.findByIdAndUpdate(createdPurchase._id, { emailSent: true });
+  console.log('Correo simulado enviado:', nodemailer.getTestMessageUrl(info));
+} catch (e) {
+  console.error('Error al enviar correo simulado:', e);
+}
+
+
+
+    
 
     res.status(201).json({
       purchase: createdPurchase,

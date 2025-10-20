@@ -10,7 +10,9 @@ const loginController = async (req, res) => {
     const { email, password } = req.body;
     try {
         // Buscar en User, Admin y Colab (en ese orden)
-        let user = await User.findOne({ email });
+        //let user = await User.findOne({ email });
+        let user = await User.findOne({ email }).select('+password');
+
         let source = 'User';
         if (!user) {
             user = await Admin.findOne({ email });
