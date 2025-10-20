@@ -6,10 +6,12 @@
     "dev": "npx next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:warnings": "node ./scripts/check-build-warnings.js"
   },
   "dependencies": {
     "next": "15.5.4",
+    "socket.io-client": "^4.8.1",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

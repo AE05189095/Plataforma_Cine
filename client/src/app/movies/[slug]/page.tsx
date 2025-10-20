@@ -1,144 +1,342 @@
-// Ruta: client/src/app/movies/[slug]/page.tsx
+// src/app/movies/[slug]/page.tsx
+
 "use client";
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState, useCallback } from "react";
+import { API_BASE } from '@/lib/config';
+import { getPriceForHall } from '@/lib/pricing';
 import Header from "@/components/Header";
-import { useParams } from "next/navigation";
+import Image from 'next/image';
+import { useParams, useRouter } from 'next/navigation';
+
+// FUNCION DE SLUG (para usar en el cliente si es necesario)
+const createSlug = (title: string): string => {
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
 interface ShowTime {
-  time: string;
-  sala: string;
-  price: string;
-  availableSeats: number;
+    time: string;
+    sala: string;
+    price: number;
+    availableSeats: number;
+    id?: string;
+    startISO?: string;
 }
+
 interface MovieData {
-  title: string;
-  rating: string;
-  score: number;
-  duration: string;
-  description: string;
-  slug: string;
-  showtimes: ShowTime[];
-  images?: string[];
-  genres?: string[];
+    title: string;
+    image?: string; // posterUrl o image de la API
+    rating?: string;
+    score?: number;
+    genre?: string;
+    duration?: string;
+    description?: string;
+    slug: string;
+    isUpcoming?: boolean; 
 }
+
+interface RawMovieResponse {
+    title?: string | null;
+    name?: string | null;
+    posterUrl?: string | null;
+    images?: (string | null)[];
+    rating?: number | string | null;
+    score?: number | null;
+    genres?: string[] | null;
+    duration?: number | string | null;
+    description?: string | null;
+    slug?: string | null;
+}
+
+// FUNCION PARA OBTENER LA URL DE LA IMAGEN
+const getImageURL = (movie: MovieData): string => {
+    let imagePath = '';
+    
+    // 1. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
+    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
+        imagePath = movie.image;
+    }
+    
+    // 2. Si no hay posterUrl válido, usar el slug
+    if (!imagePath || imagePath.includes('movie-default.svg')) {
+        const slug = movie.slug || createSlug(movie.title);
+        // Asume que el archivo local es [slug].jpg. CAMBIA .jpg si usas .png o .webp
+        imagePath = `${slug}.jpg`; 
+    }
+
+    // 3. Procesar y devolver la ruta final relativa a /public/images/
+    if (imagePath && !imagePath.startsWith('http')) {
+        const filename = imagePath.split('/').pop() || imagePath;
+        return `/images/${filename.toLowerCase()}`; 
+    }
+
+    // 4. Fallback final
+    return '/images/movie-default.svg';
+};
+
 export default function MovieDetailPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const [movie, setMovie] = useState<MovieData | null>(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const fetchMovie = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/api/movies`);
-        const data: MovieData[] = await res.json();
-        const found = data.find((m) => m.slug === slug);
-        if (found) {
-          setMovie({
-            title: found.title,
-            rating: found.rating,
-            score: found.score,
-            duration: found.duration,
-            description: found.description,
-            slug: found.slug,
-            showtimes: found.showtimes || [],
-            images: found.images?.length ? found.images : undefined,
-            genres: found.genres?.length ? found.genres : undefined,
-          });
-        } else {
-          setMovie(null);
-        }
-      } catch (err) {
-        console.error(err);
-        setMovie(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMovie();
-  }, [slug]);
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <Header />
-        <p>Cargando película...</p>
-      </div>
-    );
-  }
-  if (!movie) {
-    return (
-      <div className="min-h-screen bg-black text-white p-8 text-center">
-        <Header />
-        <h1 className="text-4xl mt-20 text-red-600">Película no encontrada 😢</h1>
-        <p className="text-lg text-gray-400 mt-4">
-          El identificador de la película no es válido: <strong>{slug}</strong>
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
-      <Header />
-      <div className="p-4 sm:p-8 md:p-12 lg:p-16">
-        <div className="flex flex-col md:flex-row gap-8 mb-12">
-          {movie.images && movie.images[0] && (
-            <img
-              src={movie.images[0]}
-              alt={movie.title}
-              className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 object-cover max-h-[600px]"
-            />
-          )}
-          <div className="flex-1 flex flex-col justify-center">
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">
-              {movie.title}
-            </h1>
-            <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
-              <span className="font-semibold text-lg">{movie.duration}</span>
-              {movie.genres &&
-                movie.genres.map((g, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1 bg-gray-800 rounded-full text-sm"
-                  >
-                    {g}
-                  </span>
-                ))}
-              <span className="px-3 py-1 bg-red-600 rounded-full text-sm font-bold">
-                {movie.rating}
-              </span>
-              <span className="px-3 py-1 bg-yellow-600 rounded-full text-sm font-bold">
-                ⭐ {movie.score}
-              </span>
+    const params = useParams();
+    const slug = params.slug as string;
+
+    const [movie, setMovie] = useState<MovieData | null>(null);
+    const [posterSrc, setPosterSrc] = useState<string>('/images/movie-default.svg');
+    const [showtimes, setShowtimes] = useState<ShowTime[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [notFound, setNotFound] = useState(false);
+    
+    // Usamos useCallback para que la función no cambie en cada render
+    const updatePosterSrc = useCallback((newSrc: string) => {
+        setPosterSrc(getImageURL({ ...movie!, image: newSrc }));
+    }, [movie]);
+
+    useEffect(() => {
+        if (!slug) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+
+            // 🚨 1. LÓGICA DE EXCEPCIÓN: 200% Lobo
+            if (slug === UPCOMING_SLUG) {
+                setMovie(UPCOMING_MOVIE_DATA);
+                
+                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
+                // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
+                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
+                
+                // Simulación de horarios con la fecha de estreno
+                const simulatedShowtimes: ShowTime[] = [
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
+                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
+                ];
+                
+                setShowtimes(simulatedShowtimes);
+                setLoading(false);
+                return; // Finaliza la ejecución para el próximo estreno
+            }
+
+            // 2. Obtener datos de la película (Lógica normal de API)
+            try {
+                // FETCH MOVIE DETAIL
+                const resMovie = await fetch(`${API_BASE}/api/movies/${slug}`);
+                if (resMovie.status === 404) {
+                    setNotFound(true);
+                    setLoading(false);
+                    return;
+                }
+                const movieJson = await resMovie.json();
+                
+                const movieData: MovieData = {
+                    title: movieJson.title || movieJson.name || 'Sin título',
+                    image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
+                    rating: movieJson.rating ? String(movieJson.rating) : undefined,
+                    score: (typeof movieJson.rating === 'number' && movieJson.rating) 
+                           || (typeof movieJson.score === 'number' && movieJson.score) 
+                           || undefined, 
+                    genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
+                    duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
+                    description: movieJson.description || '',
+                    slug: movieJson.slug || slug,
+                };
+                
+                setMovie(movieData);
+
+                // establecer la fuente del póster (usando la nueva lógica de generación)
+                setPosterSrc(getImageURL(movieData));
+
+                // FETCH SHOWTIMES (lógica existente)
+                const resShow = await fetch(`${API_BASE}/api/showtimes`);
+                const showJson = await resShow.json();
+
+                type RawShowtime = {
+                    movie?: { slug?: string } | string | null;
+                    startAt?: string | null;
+                    time?: string;
+                    hall?: { name?: string; capacity?: number } | string | null;
+                    seatsBooked?: string[];
+                    price?: number;
+                    _id?: string;
+                    availableSeats?: number;
+                };
+
+                const filtered = Array.isArray(showJson)
+                    ? (showJson as RawShowtime[]).filter((s) => {
+                        if (!s.movie) return false;
+                        if (typeof s.movie === 'string') return false;
+                        return typeof s.movie === 'object' && (s.movie as { slug?: string }).slug === slug;
+                    })
+                    : [];
+
+                const mapped: ShowTime[] = filtered.map((s: RawShowtime) => {
+                    const start = s.startAt ? new Date(s.startAt) : null;
+                    const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
+                    let hallName = 'Sala';
+                    const capacity = 80;
+                    if (s.hall && typeof s.hall === 'object') {
+                        hallName = (s.hall as { name?: string }).name ?? 'Sala';
+                    } else if (typeof s.hall === 'string') {
+                        hallName = s.hall;
+                    }
+                    const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
+                    const available = Math.max(0, capacity - seatsBooked);
+                    const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
+                    return {
+                        time: timeStr,
+                        sala: hallName,
+                        price: numericPrice,
+                        availableSeats: available,
+                        id: s._id,
+                        startISO: start ? start.toISOString() : undefined,
+                    };
+                });
+
+                // Si hay menos de 5 horarios, generar horarios adicionales
+                const ensureFive: ShowTime[] = [...mapped];
+                if (ensureFive.length < 5) {
+                    const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
+                    let addIndex = 0;
+                    while (ensureFive.length < 5) {
+                        addIndex += 1;
+                        const d = new Date(baseDate.getTime() + addIndex * 2 * 60 * 60 * 1000); // +2h cada vez
+                        const t = d.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
+                        ensureFive.push({
+                            time: t,
+                            sala: ensureFive[0]?.sala ?? 'Sala',
+                            price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
+                            availableSeats: ensureFive[0]?.availableSeats ?? 80,
+                            id: `${slug}-gen-${addIndex}`,
+                            startISO: d.toISOString(),
+                        });
+                    }
+                }
+
+                setShowtimes(ensureFive);
+            } catch (err) {
+                console.error('Error fetch movie/showtimes', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [slug]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-black text-white p-8">
+                <Header />
+                <div className="mt-24 text-center">Cargando película y horarios...</div>
             </div>
-            <p className="text-gray-300 text-lg leading-relaxed">{movie.description}</p>
-          </div>
-        </div>
-        {/* Horarios disponibles */}
-        <div className="mt-12">
-          <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">
-            Horarios Disponibles
-          </h2>
-          {movie.showtimes.length === 0 ? (
-            <p className="text-gray-400">No hay horarios disponibles por el momento.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {movie.showtimes.map((show, idx) => (
-                <div
-                  key={idx}
-                  className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all cursor-pointer border-l-4 border-red-600 hover:bg-gray-700"
-                >
-                  <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p>
-                  <p className="text-lg mb-2 text-gray-300">
-                    Sala: <span className="font-semibold text-white">{show.sala}</span>
-                  </p>
-                  <p className="mt-3 font-semibold text-2xl text-orange-400">{show.price}</p>
-                  <p className="text-sm mt-1 text-gray-400">
-                    {show.availableSeats} asientos disponibles
-                  </p>
+        );
+    }
+
+    // Obtener la bandera isUpcoming del objeto movie (si fue cargado por la excepción)
+    const isUpcoming = movie?.isUpcoming || false;
+    const upcomingReleaseText = `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+
+    if (notFound || !movie) {
+        return (
+            <div className="min-h-screen bg-black text-white p-8 text-center">
+                <Header /> 
+                <h1 className="text-4xl mt-20 text-red-600">Película no encontrada 😢</h1>
+                <p className="text-lg text-gray-400 mt-4">El identificador de la película no es válido: <strong>{slug}</strong></p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
+            <Header />
+            <div className="p-4 sm:p-8 md:p-12 lg:p-16">
+                <div className="flex flex-col md:flex-row gap-8 mb-12">
+                    {/* Contenedor de la Imagen: Ahora usa posterSrc generado por getImageURL */}
+                    <div className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 overflow-hidden max-h-[600px]">
+                        <Image
+                            src={posterSrc}
+                            alt={movie.title}
+                            width={400}
+                            height={600}
+                            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+                            // Si la imagen calculada (posterSrc) falla, forzamos el fallback
+                            onError={() => setPosterSrc('/images/movie-default.svg')}
+                        />
+                    </div>
+                    {/* Detalles de la Película */}
+                    <div className="flex-1 flex flex-col justify-center">
+                        {/* Título y estado de estreno */}
+                        <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 text-orange-400">
+                            {movie.title}
+                            {isUpcoming && (
+                                <span className="block text-xl font-medium text-green-400 mt-2">{upcomingReleaseText}</span>
+                            )}
+                        </h1>
+                        <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
+                            <span className="font-semibold text-lg">{movie.duration}</span>
+                            <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">{movie.genre}</span>
+                            <span className="px-3 py-1 bg-red-600 rounded-full text-sm font-bold">{movie.rating}</span>
+                            <span className="px-3 py-1 bg-yellow-600 rounded-full text-sm font-bold">⭐ {movie.score}</span>
+                        </div>
+                        <p className="text-gray-300 text-lg leading-relaxed">{movie.description}</p>
+                    </div>
                 </div>
-              ))}
+
+                <div className="mt-12">
+                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">
+                        {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
+                    </h2>
+                    {showtimes.length === 0 ? (
+                        <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para esta película."}</p>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            {showtimes.map((show) => (
+                                <MovieShowtimeCard 
+                                    key={show.id} 
+                                    show={show} 
+                                    movieSlug={movie.slug} 
+                                    isUpcoming={isUpcoming} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-          )}
         </div>
-      </div>
-    </div>
-  );
+    );
+}
+
+// ==========================================================
+// COMPONENTE SECUNDARIO
+// ==========================================================
+
+// ACTUALIZADO: Acepta la bandera isUpcoming
+function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; movieSlug: string; isUpcoming?: boolean }) {
+    const router = useRouter();
+
+    // Lógica para cambiar el botón
+    const buttonText = isUpcoming ? "Reservar" : "Comprar";
+
+    const handleBuy = () => {
+        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        router.push(`/comprar?${params.toString()}`);
+    };
+
+    return (
+        <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
+            {/* Si es estreno, muestra la fecha completa, si no, solo la hora */}
+            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
+            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
+            <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
+            <div className="mt-4 flex gap-2">
+                {/* Botón modificado para usar el texto condicional */}
+                <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
+                    {buttonText}
+                </button>
+            </div>
+        </div>
+    );
 }

@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router(); 
 
 // --- Importaciones de Controladores (Estructura Modular) ---
-const { loginController, registerController, loginAdmin, loginColab } = require('../controllers/authController');
+const { loginController, registerController, loginAdmin, loginColab, meController, changePasswordController } = require('../controllers/authController');
 const { recoverPassword, verifyEmail } = require('../controllers/recoverController.js'); 
 const authMiddleware = require('./middleware/authMiddleware'); // <--- SÓLO UNA DECLARACIÓN
 
@@ -20,6 +20,8 @@ router.post('/recover-password', recoverPassword);
 router.get('/recover-password', verifyEmail); 
 
 // --- Rutas Protegidas ---
+router.get("/me", authMiddleware, meController);
+router.post("/change-password", authMiddleware, changePasswordController);
 
 // Mantenemos la ruta /protegida original de presentation/final-demo
 router.get('/protegida', authMiddleware, (req, res) => {
@@ -29,8 +31,5 @@ router.get('/protegida', authMiddleware, (req, res) => {
         role: req.userId.role
     });
 });
-
-// Nota: La ruta /comprar no fue incluida porque causaba inconsistencia en el uso de req.user/req.userId.
-// La versión estable de /protegida fue la elegida.
 
 module.exports = router;

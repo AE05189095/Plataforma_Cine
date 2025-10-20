@@ -1,27 +1,29 @@
-// server/src/routes/middleware/authMiddleware.js (VERSIÓN FINAL)
-
+// server/src/middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = process.env.JWT_SECRET || "clave_secreta";
 
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
- // 🔑 Validación robusta: verifica que exista y que empiece con "Bearer "
- if (!authHeader || !authHeader.startsWith("Bearer ")) {
-  return res.status(401).json({ message: "Token no proporcionado o mal formado" });
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.trim() === "") {
+  throw new Error("JWT_SECRET no está definido en las variables de entorno");
 }
 
-  const token = authHeader.split(" ")[1];
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(401).json({ message: "Token expirado o inválido" });
-    }
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Token no proporcionado o mal formado" });
+  }
 
-    // 🛡️ Asigna el objeto decodificado completo a req.userId
-    req.userId = decoded;
-    next();
-  });
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Guarda solo los datos necesarios (p. ej. id y rol)
+    req.user = { id: decoded.userId, role: decoded.role };
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Token expirado o inválido" });
+  }
 };
 
 module.exports = authMiddleware;
