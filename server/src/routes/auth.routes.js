@@ -20,9 +20,9 @@ router.post('/recover-password', recoverPassword);
 router.get('/recover-password', verifyEmail); 
 
 // --- Rutas Protegidas ---
-/*router.get("/me", authMiddleware, meController);
-router.post("/change-password", authMiddleware, changePasswordController);*/
-//rutas protegidas comentadas para funcionamiento de backend descomentar de ser necesario
+router.get("/me", authMiddleware, meController);
+router.post("/change-password", authMiddleware, changePasswordController);
+
 
 // Mantenemos la ruta /protegida original de presentation/final-demo
 router.get('/protegida', authMiddleware, (req, res) => {

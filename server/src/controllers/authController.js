@@ -199,4 +199,110 @@ const loginByModel = async (req, res, Model, fixedRole) => {
   }
 };
 
-module.exports = {loginController, registerController, loginAdmin, loginColab,};
+// ==========================================================
+// FUNCIONES CORREGIDAS PARA JS
+// ==========================================================
+
+// --- OBTENER DATOS DE USUARIO LOGUEADO (GET /me) ---
+const meController = async (req, res) => {
+    // 🚨 CORRECCIÓN: Se elimina la aserción de tipo TypeScript '(req as any)'
+    const userId = req.userId; 
+
+    if (!userId) {
+        return res.status(401).json({ message: "Token válido, pero ID de usuario no adjunto." });
+    }
+
+    try {
+        const [userResult, adminResult, colabResult] = await Promise.allSettled([
+            User.findById(userId).select('-password'),
+            Admin.findById(userId).select('-password'),
+            Colab.findById(userId).select('-password')
+        ]);
+
+        let user = null;
+        let role = 'cliente';
+
+        if (userResult.status === 'fulfilled' && userResult.value) {
+            user = userResult.value;
+            role = 'cliente';
+        } else if (adminResult.status === 'fulfilled' && adminResult.value) {
+            user = adminResult.value;
+            role = 'admin';
+        } else if (colabResult.status === 'fulfilled' && colabResult.value) {
+            user = colabResult.value;
+            role = 'colaborador';
+        }
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario asociado al token no encontrado." });
+        }
+
+        return res.status(200).json({
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                role: user.role || role
+            }
+        });
+
+    } catch (error) {
+        console.error("Error al obtener datos del usuario /me:", error);
+        return res.status(500).json({ message: "Error interno del servidor." });
+    }
+};
+
+// --- CAMBIAR CONTRASEÑA (POST /change-password) ---
+const changePasswordController = async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    // 🚨 CORRECCIÓN: Se elimina la aserción de tipo TypeScript '(req as any)'
+    const userId = req.userId; 
+
+    if (!oldPassword || !newPassword) {
+        return res.status(400).json({ message: "Faltan la contraseña actual o la nueva contraseña." });
+    }
+    
+    if (oldPassword === newPassword) {
+        return res.status(400).json({ message: "La nueva contraseña debe ser diferente a la anterior." });
+    }
+
+    try {
+        const [userResult, adminResult, colabResult] = await Promise.allSettled([
+            User.findById(userId).select('+password'),
+            Admin.findById(userId).select('+password'),
+            Colab.findById(userId).select('+password')
+        ]);
+
+        let user = null;
+
+        if (userResult.status === 'fulfilled' && userResult.value) {
+            user = userResult.value;
+        } else if (adminResult.status === 'fulfilled' && adminResult.value) {
+            user = adminResult.value;
+        } else if (colabResult.status === 'fulfilled' && colabResult.value) {
+            user = colabResult.value;
+        }
+
+        if (!user) {
+            return res.status(404).json({ message: "Usuario no encontrado." });
+        }
+
+        const isMatch = await user.comparePassword(oldPassword);
+        
+        if (!isMatch) {
+            return res.status(401).json({ message: "La contraseña actual es incorrecta." });
+        }
+
+        user.password = newPassword; 
+        await user.save();
+
+        res.status(200).json({ message: "Contraseña cambiada exitosamente." });
+
+    } catch (error) {
+        console.error("Error al cambiar la contraseña:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
+};
+
+
+module.exports = {loginController, registerController, loginAdmin, loginColab,meController, changePasswordController};

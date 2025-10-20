@@ -20,6 +20,7 @@ const authMiddleware = (req, res, next) => {
 
     // Guarda solo los datos necesarios (p. ej. id y rol)
     req.user = { id: decoded.userId, role: decoded.role };
+    req.userId = decoded.userId;
     next();
   } catch (err) {
     return res.status(401).json({ message: "Token expirado o inválido" });
