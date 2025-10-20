@@ -6,6 +6,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path'); // 🖼️ Necesario para manejar rutas de archivos estáticos
+const cookieParser = require('cookie-parser'); // 🛑 ¡NUEVO REQUIRE AGREGADO!
 const { helmet, apiLimiter } = require('./src/middleware/security');
 
 const authRoutes = require('./src/routes/auth.routes.js');
@@ -16,6 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
+// 🛑 Asegúrate de que tu .env contenga ALLOWED_ORIGIN=http://localhost:3000
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 // ==========================================================
@@ -26,11 +28,16 @@ if (ALLOWED_ORIGIN === '*' && process.env.NODE_ENV === 'production') {
   console.warn('⚠️  ALLOWED_ORIGIN está en "*" en producción. Considere restringirlo.');
 }
 
+// 🛑 CONFIGURACIÓN DE CORS REVISADA (La clave es credentials: true)
 app.use(
   cors({
-    origin: ALLOWED_ORIGIN,
+    // Si ALLOWED_ORIGIN es '*', CORS lo manejará. Si es una URL específica, se usa.
+    origin: ALLOWED_ORIGIN, 
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: ALLOWED_ORIGIN !== '*',
+    // 🛑 Forzamos credentials: true para permitir el envío de cookies/tokens JWT
+    credentials: true, 
+    // Los headers son importantes para Axios
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 
@@ -41,6 +48,9 @@ app.use('/api', apiLimiter);
 
 // Middleware para procesar JSON
 app.use(express.json());
+
+// 🛑 ¡CORRECCIÓN CLAVE! Este middleware puebla req.cookies para que AuthMiddleware funcione.
+app.use(cookieParser()); 
 
 // ==========================================================
 // 🖼️ CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS (IMÁGENES)
@@ -73,14 +83,14 @@ app.get('/', (req, res) => {
 if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
   console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
   console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
-  console.error('    MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
+  console.error('     MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
   process.exit(1);
 }
 
 if (typeof JWT_SECRET !== 'string' || JWT_SECRET.trim() === '') {
   console.error('❌ ERROR: la variable de entorno JWT_SECRET no está definida o es inválida.');
   console.error('Define JWT_SECRET en el archivo .env dentro de la carpeta server. Ej:');
-  console.error('    JWT_SECRET=una_clave_muy_segura');
+  console.error('     JWT_SECRET=una_clave_muy_segura');
   process.exit(1);
 }
 
@@ -92,8 +102,10 @@ mongoose
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: {
+        // La configuración del socket.io también debe usar el origen permitido
         origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
         methods: ['GET', 'POST'],
+        // Socket.io maneja sus propias credenciales/headers
       },
     });
 
