@@ -1,11 +1,11 @@
-
-
 const express = require('express');
 const router = express.Router(); 
 
 
 const { loginController, registerController, meController, changePasswordController } = require('../controllers/authController');
 
+// 🚨 CORRECCIÓN CRÍTICA DE RUTA: 
+// Se corrigió a './middleware/authMiddleware' para reflejar que está en una subcarpeta
 const authMiddleware = require('./middleware/authMiddleware');
 
 
@@ -24,13 +24,9 @@ router.post('/recover-password', recoverPassword);
 
 router.get('/recover-password', verifyEmail); 
 
-// Rutas protegidas
-// router.get('/me', authMiddleware, meController);
-// router.post('/change-password', authMiddleware, changePasswordController);
+// 🚨 Rutas protegidas descomentadas y activadas
+router.get('/me', authMiddleware, meController);
+router.post('/change-password', authMiddleware, changePasswordController);
 
 module.exports = router;
-
-
-                                                    
-
 
