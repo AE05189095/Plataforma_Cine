@@ -80,4 +80,3 @@ const loginColab = async (req, res) => {
 };
 
 module.exports = { loginController, registerController, loginAdmin, loginColab };
-

@@ -25,11 +25,12 @@ router.post('/recover-password', recoverPassword);
 router.get('/recover-password', verifyEmail); 
 
 // Rutas protegidas
-router.get('/me', authMiddleware, meController);
-router.post('/change-password', authMiddleware, changePasswordController);
-
-
+// router.get('/me', authMiddleware, meController);
+// router.post('/change-password', authMiddleware, changePasswordController);
 
 module.exports = router;
+
+
+                                                    
 
 

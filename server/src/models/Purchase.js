@@ -8,6 +8,16 @@ const purchaseSchema = new mongoose.Schema(
     totalPrice: { type: Number, required: true },
     status: { type: String, enum: ['reserved', 'paid', 'cancelled'], default: 'reserved' },
   paymentInfo: { type: Object, select: false },
+   
+    confirmationCode: {
+      type: String,
+      required: true // se genera en el backend al confirmar la compra
+    },
+
+    emailSent: {
+      type: Boolean,
+      default: false // se actualiza a true tras enviar el correo
+    }
   },
   { timestamps: true }
 );
