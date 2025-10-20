@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react"; // 🚨 Agregado useCallback
 import { io, Socket } from 'socket.io-client';
 import ProtectedRoute from "@/components/Protectedroute";
 import SeatMap from "@/components/SeatMap";
@@ -18,6 +18,9 @@ type Seat = {
   status: string;
 };
 
+// 🚨 CORRECCIÓN SOCKET.IO: Usar el puerto 5000 del backend, no el puerto de la ventana
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 export default function ComprarPage() {
   const [selected, setSelected] = useState<Seat[]>([]);
   const [occupied, setOccupied] = useState<string[]>([]);
@@ -29,6 +32,11 @@ export default function ComprarPage() {
 
   // Obtener showtimeId desde la URL en tiempo de ejecución (cliente)
   const showtimeId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('showtimeId') : null;
+
+  // 🚨 CORRECCIÓN BUCLE INFINITO: Estabilizar la función onSelectionChange con useCallback
+  const handleSelectionChange = useCallback((s: Seat[]) => {
+    setSelected(s);
+  }, [setSelected]); // Dependencia setSelected es estable
 
   useEffect(() => {
     if (!showtimeId) return;
@@ -54,20 +62,20 @@ export default function ComprarPage() {
 
     // re-ejecutar cuando la ventana recibe foco (volver desde otra página/tab)
     const onFocus = () => {
-      try { fetchShowtime(); } catch {}
+      try { fetchShowtime(); } catch (e) {}
     };
     const onPop = () => {
       // cuando el usuario navega de regreso con el historial
-      try { fetchShowtime(); } catch {}
+      try { fetchShowtime(); } catch (e) {}
     };
     window.addEventListener('focus', onFocus);
     window.addEventListener('popstate', onPop);
 
     // Conectar socket para recibir actualizaciones en tiempo real
-    const socketUrl = typeof window !== 'undefined' ? window.location.origin : '';
     let socket: Socket | null = null;
     try {
-      socket = io(socketUrl, { autoConnect: true });
+      // 🚨 USO DE SOCKET_URL CORREGIDA
+      socket = io(SOCKET_URL, { autoConnect: true }); 
       socket.on('connect', () => console.log('socket connected', socket?.id));
       socket.on('showtimeUpdated', (payload: unknown) => {
         try {
@@ -88,8 +96,8 @@ export default function ComprarPage() {
     }
 
     return () => {
-      try { if (socket) socket.disconnect(); } catch {}
-      try { window.removeEventListener('focus', onFocus); window.removeEventListener('popstate', onPop); } catch {}
+      try { if (socket) socket.disconnect(); } catch (e) {}
+      try { window.removeEventListener('focus', onFocus); window.removeEventListener('popstate', onPop); } catch (e) {}
     };
   }, [showtimeId]);
 
@@ -114,7 +122,8 @@ export default function ComprarPage() {
               <div className="lg:col-span-2 flex justify-center">
                 <SeatMap
                   occupiedSeats={occupied}
-                  onSelectionChange={(s) => setSelected(s as Seat[])}
+                  // 🚨 USO DE LA FUNCIÓN ESTABILIZADA
+                  onSelectionChange={handleSelectionChange}
                 />
               </div>
 
@@ -163,16 +172,16 @@ export default function ComprarPage() {
                 setOccupied(body.showtime?.seatsBooked || []);
                 setSelected([]);
                 setPaymentModal(null);
-                        setToast({ open: true, message: 'Compra y reserva exitosa', type: 'success', position: 'center' });
+                setToast({ open: true, message: 'Compra y reserva exitosa', type: 'success', position: 'center' });
               } catch (err: unknown) {
                 let msg = 'No se pudo procesar la compra';
                 if (err && typeof err === 'object' && 'message' in err) msg = (err as { message?: string }).message || msg;
-                        setToast({ open: true, message: msg, type: 'error', position: 'top-right' });
+                setToast({ open: true, message: msg, type: 'error', position: 'top-right' });
               }
             }}
           />
         )}
-  <Toast open={toast.open} message={toast.message} type={toast.type} position={toast.position} onClose={() => setToast({ open: false, message: '', type: 'info' })} />
+    <Toast open={toast.open} message={toast.message} type={toast.type} position={toast.position} onClose={() => setToast({ open: false, message: '', type: 'info' })} />
       </div>
     </ProtectedRoute>
   );
