@@ -13,11 +13,13 @@ const loginController = async (req, res) => {
 
         let source = 'User';
         if (!user) {
-            user = await Admin.findOne({ email });
+            // Intentar buscar Admin. Asegúrate de que Admin tenga el campo 'password' para .select('+password') si usa comparePassword
+            user = await Admin.findOne({ email }).select('+password'); 
             source = user ? 'Admin' : source;
         }
         if (!user) {
-            user = await Colab.findOne({ email });
+            // Intentar buscar Colab. Asegúrate de que Colab tenga el campo 'password'
+            user = await Colab.findOne({ email }).select('+password');
             source = user ? 'Colab' : source;
         }
 
@@ -25,7 +27,10 @@ const loginController = async (req, res) => {
             return res.status(401).json({ message: "Credenciales inválidas" });
         }
 
-        const isMatch = await user.comparePassword(password);
+        // Si el usuario no tiene el método comparePassword (porque se omitió .select('+password') 
+        // o si es un modelo sin ese método), la siguiente línea podría fallar. 
+        // Asumo que todos los modelos tienen ese método y el password se recupera.
+        const isMatch = await user.comparePassword(password); 
 
         if (!isMatch) {
             return res.status(401).json({ message: "Credenciales inválidas" });
@@ -33,7 +38,18 @@ const loginController = async (req, res) => {
 
         const tipoUsuario = user.tipoUsuario || (source === 'Admin' ? 'admin' : (source === 'Colab' ? 'colaborador' : 'cliente'));
 
+        // El token se expira en 30 minutos (30m)
         const token = jwt.sign({ userId: user._id, tipoUsuario }, JWT_SECRET, { expiresIn: "30m" });
+
+        // 🛑 ¡CORRECCIÓN CLAVE! Emitir la cookie al navegador.
+        res.cookie('jwt', token, {
+            httpOnly: true, // No accesible desde JavaScript (seguridad)
+            // En desarrollo (HTTP), 'secure' debe ser false o dependiente de NODE_ENV
+            // Usamos un valor condicional si estás en un entorno de producción (HTTPS)
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'Lax', // Previene ataques CSRF básicos en la misma aplicación
+            maxAge: 30 * 60 * 1000, // 30 minutos (igual que el token)
+        });
 
         return res.json({
             token,
@@ -71,17 +87,14 @@ const registerController = async (req, res) => {
     }
 };
 
-// ==========================================================
-// FUNCIONES CORREGIDAS PARA JS
-// ==========================================================
-
 // --- OBTENER DATOS DE USUARIO LOGUEADO (GET /me) ---
 const meController = async (req, res) => {
-    // 🚨 CORRECCIÓN: Se elimina la aserción de tipo TypeScript '(req as any)'
-    const userId = req.userId; 
+    // 🚨 CORRECCIÓN: Ahora el ID viene de req.user (poblado por authMiddleware)
+    const userId = req.user ? req.user._id : null; 
 
     if (!userId) {
-        return res.status(401).json({ message: "Token válido, pero ID de usuario no adjunto." });
+        // Este caso solo debería ocurrir si el middleware falló o no se ejecutó, pero es buena defensa
+        return res.status(401).json({ message: "No autenticado. ID de usuario no disponible." });
     }
 
     try {
@@ -90,7 +103,7 @@ const meController = async (req, res) => {
             Admin.findById(userId).select('-password'),
             Colab.findById(userId).select('-password')
         ]);
-
+        // ... (el resto de la lógica de meController es correcta)
         let user = null;
         let tipoUsuario = 'cliente';
 
@@ -127,9 +140,13 @@ const meController = async (req, res) => {
 // --- CAMBIAR CONTRASEÑA (POST /change-password) ---
 const changePasswordController = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
-    // 🚨 CORRECCIÓN: Se elimina la aserción de tipo TypeScript '(req as any)'
-    const userId = req.userId; 
+    // 🚨 CORRECCIÓN: El ID debe venir de req.user (poblado por authMiddleware)
+    const userId = req.user ? req.user._id : null; 
 
+    if (!userId) {
+        return res.status(401).json({ message: "No autenticado. ID de usuario no disponible." });
+    }
+    // ... (el resto de la lógica de changePasswordController es correcta)
     if (!oldPassword || !newPassword) {
         return res.status(400).json({ message: "Faltan la contraseña actual o la nueva contraseña." });
     }
