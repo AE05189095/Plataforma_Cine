@@ -10,9 +10,9 @@ const userSchema = new mongoose.Schema(
     // Correo electrónico (único)
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     // Contraseña encriptada
-    password: { type: String, required: true, select: false },
+    password: { type: String, required: true },
     // Tipo de usuario: 'cliente' por defecto
-    tipoUsuario: { type: String, enum: ["cliente", "admin"], default: "cliente" },
+    role: { type: String, enum: ["cliente","colaborador", "admin"], default: "cliente" },
   },
   {
     timestamps: true, // createdAt, updatedAt
@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
 );
 
 // 🔑 MIDDLEWARE (PRE-SAVE HOOK): Encriptar la contraseña antes de guardarla 🔑
-userSchema.pre("save", async function (next) {
+/*userSchema.pre("save", async function (next) {
     // Solo hashea si la contraseña ha sido modificada (o es nueva)
     if (!this.isModified("password")) {
         return next();
@@ -32,7 +32,7 @@ userSchema.pre("save", async function (next) {
     } catch (err) {
         next(err);
     }
-});
+});*/
 
 // Método para comparar contraseñas (útil en el login)
 userSchema.methods.comparePassword = async function (candidatePassword) {
