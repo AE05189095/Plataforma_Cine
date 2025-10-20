@@ -9,6 +9,31 @@ import Header from "@/components/Header";
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 
+// ==========================================================
+// 🚨 CORRECCIÓN DE ERROR: DEFINICIÓN DE CONSTANTES FALTANTES
+// Estas constantes son para la excepción 'Próximo Estreno'
+// ==========================================================
+
+const UPCOMING_SLUG = 'proximamente';
+const UPCOMING_RELEASE_DATE = '2025-12-25'; // Fecha de estreno para simulación (ISO)
+const UPCOMING_DISPLAY_DATE = '25 de Diciembre de 2025'; // Fecha de estreno para mostrar
+
+const UPCOMING_MOVIE_DATA: MovieData = {
+    title: '200% Lobo',
+    image: '/images/200-lobo.jpg', // Ruta de imagen para el póster de excepción
+    rating: 'G',
+    score: 5.0,
+    genre: 'Animación, Aventura',
+    duration: '90 min',
+    description: 'Freddy, heredero de una noble y heroica familia de hombres lobo, se convierte en un caniche en su 13º cumpleaños, ¡convirtiéndose en la vergüenza de la familia! Con un límite de tiempo, debe demostrar que tiene el corazón de un lobo, o será desterrado para siempre.',
+    slug: UPCOMING_SLUG,
+    isUpcoming: true,
+};
+
+// ==========================================================
+// FUNCIONES Y TIPOS
+// ==========================================================
+
 // FUNCION DE SLUG (para usar en el cliente si es necesario)
 const createSlug = (title: string): string => {
     return title
@@ -79,6 +104,10 @@ const getImageURL = (movie: MovieData): string => {
     return '/images/movie-default.svg';
 };
 
+// ==========================================================
+// COMPONENTE PRINCIPAL
+// ==========================================================
+
 export default function MovieDetailPage() {
     const params = useParams();
     const slug = params.slug as string;
@@ -104,7 +133,6 @@ export default function MovieDetailPage() {
             if (slug === UPCOMING_SLUG) {
                 setMovie(UPCOMING_MOVIE_DATA);
                 
-                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
                 // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
                 setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
                 
@@ -136,8 +164,8 @@ export default function MovieDetailPage() {
                     image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
                     score: (typeof movieJson.rating === 'number' && movieJson.rating) 
-                           || (typeof movieJson.score === 'number' && movieJson.score) 
-                           || undefined, 
+                               || (typeof movieJson.score === 'number' && movieJson.score) 
+                               || undefined, 
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',

@@ -23,22 +23,35 @@ export default function SeatMap({
 }: Props) {
   const [selected, setSelected] = useState<Record<string, Seat>>({});
 
-  // Si `occupiedSeats` cambia, quitar de la selección cualquier asiento que haya pasado a ocupado
+  // Efecto 1: Deseleccionar asientos localmente cuando pasan a 'occupied'.
   useEffect(() => {
     if (!occupiedSeats || occupiedSeats.length === 0) return;
-    setSelected((prev) => {
-      const copy = { ...prev };
+    
+    // Función para obtener la nueva selección después de filtrar los ocupados
+    const newSelection = (prevSelected: Record<string, Seat>) => {
       let changed = false;
+      const copy = { ...prevSelected };
       for (const id of occupiedSeats) {
         if (copy[id]) {
           delete copy[id];
           changed = true;
         }
       }
-      if (changed && onSelectionChange) onSelectionChange(Object.values(copy));
-      return copy;
-    });
-  }, [occupiedSeats, onSelectionChange]);
+      if (changed) return copy;
+      return prevSelected;
+    };
+    
+    setSelected(newSelection);
+  }, [occupiedSeats]);
+  
+  // Efecto 2: Notificar al componente padre CADA VEZ que el estado 'selected' cambia localmente.
+  // Esto funciona porque el padre (ComprarPage) ahora usa useCallback.
+  useEffect(() => {
+      if (onSelectionChange) {
+          onSelectionChange(Object.values(selected));
+      }
+  }, [selected, onSelectionChange]);
+
 
   // Mantener una copia local de occupiedSeats para forzar re-render cuando cambie el contenido
   const [localOccupied, setLocalOccupied] = useState<string[]>(occupiedSeats || []);
@@ -60,6 +73,7 @@ export default function SeatMap({
     return { id, row, number: num, status };
   };
 
+  // Función toggleSeat: Solo actualiza el estado local.
   const toggleSeat = (seat: Seat) => {
     if (seat.status === "occupied") return;
     setSelected((prev) => {
@@ -69,7 +83,6 @@ export default function SeatMap({
       } else {
         copy[seat.id] = seat;
       }
-      if (onSelectionChange) onSelectionChange(Object.values(copy));
       return copy;
     });
   };
@@ -81,17 +94,27 @@ export default function SeatMap({
       </div>
 
       <div className="w-full flex justify-center">
+        {/* Ajustamos la plantilla de la cuadrícula: 1 columna para la letra + N columnas para los asientos */}
         <div className="space-y-2">
           {rows.map((row) => (
-            <div key={row} className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 48px)` }}>
+            <div 
+              key={row} 
+              className="grid gap-2 items-center" 
+              // Agregamos una columna de 20px para la letra de la fila
+              style={{ gridTemplateColumns: `20px repeat(${cols}, 48px)` }}
+            >
+              {/* 🚨 NUEVO: Indicador de Fila (Letra) */}
+              <div className="text-gray-400 font-bold text-lg text-center">{row}</div>
+              
+              {/* Renderizado de Asientos */}
               {Array.from({ length: cols }, (_, i) => {
                 const num = i + 1;
                 const seat = makeSeat(row, num);
                 const isSelected = !!selected[seat.id];
                 const baseClass = "w-12 h-12 rounded flex items-center justify-center text-sm font-medium border shadow-sm";
-                let statusClass = "bg-white text-black border-gray-300";
-                if (seat.status === "occupied") statusClass = "bg-gray-600 text-white border-gray-600";
-                if (seat.status === "premium") statusClass = "bg-red-600 text-white border-red-600";
+                let statusClass = "bg-white text-black border-gray-300 hover:bg-gray-200";
+                if (seat.status === "occupied") statusClass = "bg-gray-600 text-white border-gray-600 cursor-not-allowed";
+                if (seat.status === "premium") statusClass = "bg-red-600 text-white border-red-600 hover:bg-red-700";
 
                 // Si el asiento está seleccionado, mostrar estilo de seleccionado
                 let selectedClass = "";
@@ -101,6 +124,7 @@ export default function SeatMap({
                     statusClass = 'bg-gray-700 text-white border-gray-600';
                     selectedClass = 'ring-2 ring-gray-400';
                   } else {
+                    statusClass = 'bg-green-500 text-white border-green-500 hover:bg-green-600'; // Color claro al seleccionar un asiento estándar
                     selectedClass = 'ring-2 ring-red-500';
                   }
                 }
@@ -109,8 +133,10 @@ export default function SeatMap({
                   <button
                     key={seat.id}
                     onClick={() => toggleSeat(seat)}
-                    className={`${baseClass} ${statusClass} ${selectedClass}`}
-                    title={`${seat.id} - ${seat.status}`}
+                    disabled={seat.status === "occupied"} // Desactivar el botón
+                    className={`${baseClass} ${statusClass} ${selectedClass} transition-colors duration-100`}
+                    // 🚨 MOSTRAR ID COMPLETO (A7, B3) en el tooltip
+                    title={`Asiento ${seat.id} - ${seat.status}`}
                     aria-pressed={isSelected}
                     aria-label={`Asiento ${seat.id} ${seat.status}`}
                   >
@@ -128,7 +154,8 @@ export default function SeatMap({
         <div className="flex items-center gap-6">
           <span className="inline-block w-4 h-4 bg-white border" /> Disponible
           <span className="inline-block w-4 h-4 bg-red-600 border-red-600" /> Premium
-          <span className="inline-block w-4 h-4 bg-gray-700 border" /> Seleccionado (premium: gris)
+          <span className="inline-block w-4 h-4 bg-green-500 border-green-500" /> Seleccionado (estándar)
+          <span className="inline-block w-4 h-4 bg-gray-700 border" /> Seleccionado (premium)
           <span className="inline-block w-4 h-4 bg-gray-600 border" /> Ocupado
         </div>
       </div>
