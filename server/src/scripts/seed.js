@@ -31,27 +31,26 @@ async function main() {
     password: 'password123',
   });
 
-  // Crear varias salas reales
-  const hallsData = [
-    { name: 'Sala 1 - Principal', capacity: 120 },
-    { name: 'Sala 2 - VIP', capacity: 60 },
-    { name: 'Sala 3 - 3D', capacity: 90 },
-  ];
-  const halls = await Hall.insertMany(hallsData);
 
   // Películas reales (no ficticias) - datos mínimos
   const moviesData = [
-    { title: 'Inception', slug: 'inception', description: 'Un thriller de ciencia ficción dirigido por Christopher Nolan.', genres: ['Sci-Fi', 'Thriller'], duration: 148, director: 'Christopher Nolan', releaseDate: new Date('2010-07-16') },
-    { title: 'Interstellar', slug: 'interstellar', description: 'Exploración espacial y drama familiar.', genres: ['Sci-Fi', 'Drama'], duration: 169, director: 'Christopher Nolan', releaseDate: new Date('2014-11-07') },
-    { title: 'Parasite', slug: 'parasite', description: 'Thriller surcoreano que mezcla géneros.', genres: ['Drama', 'Thriller'], duration: 132, director: 'Bong Joon-ho', releaseDate: new Date('2019-05-30') },
-    { title: 'La La Land', slug: 'la-la-land', description: 'Musical romántico moderno.', genres: ['Musical', 'Romance'], duration: 128, director: 'Damien Chazelle', releaseDate: new Date('2016-12-09') },
-    { title: 'The Shawshank Redemption', slug: 'the-shawshank-redemption', description: 'Drama carcelario basado en Stephen King.', genres: ['Drama'], duration: 142, director: 'Frank Darabont', releaseDate: new Date('1994-09-22') },
+    { title: 'Inception', slug: 'inception', description: 'Un thriller de ciencia ficción dirigido por Christopher Nolan.', genres: ['Sci-Fi', 'Thriller'], duration: 148, director: 'Christopher Nolan', releaseDate: new Date('2010-07-16'), posterUrl: 'https://m.media-amazon.com/images/M/MV5BNTQxYmM1NzQtY2FiZS00MzRhLTljZDYtZjRmMGNiMWI3NTQxXkEyXkFqcGc@._V1_.jpg' },
+    { title: 'Interstellar', slug: 'interstellar', description: 'Exploración espacial y drama familiar.', genres: ['Sci-Fi', 'Drama'], duration: 169, director: 'Christopher Nolan', releaseDate: new Date('2014-11-07'), posterUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS0zt0lp-O3XdL8zzdrEvyzmcl6kOwfgbv4xQ&s' },
+    { title: 'Parasite', slug: 'parasite', description: 'Thriller surcoreano que mezcla géneros.', genres: ['Drama', 'Thriller'], duration: 132, director: 'Bong Joon-ho', releaseDate: new Date('2019-05-30'), posterUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcyJYd_sWzQdj87gwIiDRpi6JtzfY6-XLG-w&s' },
+    { title: 'La La Land', slug: 'la-la-land', description: 'Musical romántico moderno.', genres: ['Musical', 'Romance'], duration: 128, director: 'Damien Chazelle', releaseDate: new Date('2016-12-09'), posterUrl: 'https://m.media-amazon.com/images/M/MV5BYmI2MDIyYWYtZWY0MC00MWFkLTkxMjYtMWQ3N2Y1Zjk1MmM5XkEyXkFqcGc@._V1_.jpg' },
+    { title: 'The Shawshank Redemption', slug: 'the-shawshank-redemption', description: 'Drama carcelario basado en Stephen King.', genres: ['Drama'], duration: 142, director: 'Frank Darabont', releaseDate: new Date('1994-09-22'), posterUrl: 'https://m.media-amazon.com/images/M/MV5BMDAyY2FhYjctNDc5OS00MDNlLThiMGUtY2UxYWVkNGY2ZjljXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg' },
   ];
 
   const movies = [];
+  const allHalls = [];
   for (const m of moviesData) {
     const created = await Movie.create(m);
     movies.push(created);
+    // Crear 5 salas exclusivas para cada película
+    for (let i = 1; i <= 5; i++) {
+      const hall = await Hall.create({ name: `Sala ${i} - ${created.title}`, capacity: 64 });
+      allHalls.push({ hall, movieId: created._id });
+    }
   }
 
   // Horarios plausibles (5 por película): horarios típicos del cine
@@ -77,61 +76,14 @@ async function main() {
   for (let mi = 0; mi < movies.length; mi++) {
     const movie = movies[mi];
     const movieDuration = movie.duration || 120; // minutos
+    // Obtener las 5 salas exclusivas de esta película
+    const movieHalls = allHalls.filter(h => String(h.movieId) === String(movie._id)).map(h => h.hall);
 
     for (let si = 0; si < timeStrings.length; si++) {
       const [hourStr, minStr] = timeStrings[si].split(':');
-
-      let assignedHall = null;
-      let chosenStart = null;
-
-      // Buscar una sala y día sin conflicto
-      for (let dayOffset = 0; dayOffset <= maxDayAdvance && !assignedHall; dayOffset++) {
-        for (let hi = 0; hi < halls.length && !assignedHall; hi++) {
-          const hall = halls[hi];
-          const candidateStart = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate() + dayOffset, Number(hourStr), Number(minStr));
-          const candidateEnd = new Date(candidateStart.getTime() + minutesToMs(movieDuration));
-
-          // Comprobar conflictos con los showtimes ya creados en esa sala
-          const conflict = createdShowtimesMeta.some((c) => {
-            if (String(c.hall) !== String(hall._id)) return false;
-            const existingStart = c.startAt;
-            const existingEnd = c.endAt;
-            return overlaps(candidateStart, candidateEnd, existingStart, existingEnd, bufferMinutes);
-          });
-
-          if (!conflict) {
-            assignedHall = hall;
-            chosenStart = candidateStart;
-            break;
-          }
-        }
-      }
-
-      // Si no encontró sala en el rango, aplicar fallback: asignar por rotación y desplazar 30 min hasta encontrar
-      if (!assignedHall) {
-        let fallbackHall = halls[(mi + si) % halls.length];
-        let trialStart = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate(), Number(hourStr), Number(minStr));
-        let attempts = 0;
-        const maxAttempts = 48; // hasta 12 horas en intervalos de 15min
-        while (attempts < maxAttempts && !assignedHall) {
-          const trialEnd = new Date(trialStart.getTime() + minutesToMs(movieDuration));
-          const conflict = createdShowtimesMeta.some((c) => String(c.hall) === String(fallbackHall._id) && overlaps(trialStart, trialEnd, c.startAt, c.endAt, bufferMinutes));
-          if (!conflict) {
-            assignedHall = fallbackHall;
-            chosenStart = trialStart;
-            break;
-          }
-          // desplazar 15 minutos
-          trialStart = new Date(trialStart.getTime() + minutesToMs(15));
-          attempts++;
-        }
-        // si aún no hay, asignar la primera sala y dejar el primer horario (aceptando posible conflicto)
-        if (!assignedHall) {
-          assignedHall = fallbackHall;
-          chosenStart = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate(), Number(hourStr), Number(minStr));
-        }
-      }
-
+      // Asignar cada showtime a una de las 5 salas de la película, rotando
+      const assignedHall = movieHalls[si % movieHalls.length];
+      const chosenStart = new Date(startDay.getFullYear(), startDay.getMonth(), startDay.getDate(), Number(hourStr), Number(minStr));
       const price = Number((4.5 + (movie.duration ? Math.round(movie.duration / 30) * 0.5 : 1) + (si * 0.2)).toFixed(2));
 
       const st = await Showtime.create({
@@ -141,7 +93,7 @@ async function main() {
         price,
       });
 
-      // registrar meta para futuras comprobaciones
+      // registrar meta para futuras comprobaciones (opcional, ya no se usa para conflictos)
       const endAt = new Date(chosenStart.getTime() + minutesToMs(movieDuration));
       createdShowtimesMeta.push({ hall: String(assignedHall._id), startAt: chosenStart, endAt });
     }
@@ -149,7 +101,7 @@ async function main() {
 
   console.log('Seed completado:');
   console.log('Usuarios creados:', user._id.toString());
-  console.log('Salas creadas:', halls.map(h => ({ id: h._id.toString(), name: h.name })));
+  console.log('Salas creadas:', allHalls.map(h => ({ id: h.hall._id.toString(), name: h.hall.name, pelicula: movies.find(m => String(m._id) === String(h.movieId))?.title })));
   console.log('Películas creadas:', movies.map(m => ({ id: m._id.toString(), title: m.title })));
   console.log('Showtimes creados (ejemplo 5 por película):', createdShowtimesMeta.length);
 

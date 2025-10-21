@@ -60,3 +60,33 @@ exports.remove = async (req, res) => {
     res.status(500).json({ message: 'Error interno del servidor' });
   }
 };
+
+// Sincronizar desde el cliente: crear películas que el cliente considera válidas pero no existen en la BD
+exports.syncFromClient = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body) ? req.body : req.body?.movies || [];
+    if (!Array.isArray(items)) return res.status(400).json({ message: 'Payload inválido' });
+
+    const created = [];
+    for (const it of items) {
+      const title = it.title && String(it.title).trim();
+      if (!title) continue;
+      const slug = it.slug || (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-') : undefined);
+      // buscar por slug o por título exacto
+      const exists = await Movie.findOne({ $or: [{ slug }, { title }] }).lean();
+      if (exists) continue;
+      const payload = { title, slug, posterUrl: it.image || it.posterUrl || '', description: it.description || '', isActive: true };
+      try {
+        const doc = await Movie.create(payload);
+        created.push(doc);
+      } catch (e) {
+        console.warn('No se pudo crear película desde sync:', title, e.message || e);
+      }
+    }
+
+    res.json({ createdCount: created.length, created: created.map(c => ({ id: c._id, title: c.title })) });
+  } catch (err) {
+    console.error('movieController.syncFromClient error:', err);
+    res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};

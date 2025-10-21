@@ -8,6 +8,9 @@ const purchaseSchema = new mongoose.Schema(
     totalPrice: { type: Number, required: true },
     status: { type: String, enum: ['reserved', 'paid', 'cancelled'], default: 'reserved' },
   paymentInfo: { type: Object, select: false },
+  reservedUntil: { type: Date },
+  cancelledAt: { type: Date },
+  cancelReason: { type: String },
   },
   { timestamps: true }
 );

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import MovieCard from "@/components/MovieCard";
 import Header from "@/components/Header";
+import { useState as useStateHook } from 'react';
 import { useRouter } from "next/navigation";
 
 interface RawMovie {
@@ -49,6 +50,7 @@ export default function HomePage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [movies, setMovies] = useState<MovieData[]>(MOVIES_CARTELERA);
   const [logoClickCount, setLogoClickCount] = useState(0);
+  const [syncing, setSyncing] = useStateHook(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Limpiar timeout al desmontar
@@ -82,7 +84,18 @@ export default function HomePage() {
         const data = await res.json();
 
         // Mapear los campos del backend a MovieData para MovieCard
-        const mapped: MovieData[] = (data as unknown as RawMovie[]).map((m) => ({
+        // Filtrar sólo películas que provienen del backend: deben tener al menos un identificador o título válido
+        const rawArray = Array.isArray(data) ? (data as unknown as RawMovie[]) : [];
+        const filteredRaw = rawArray.filter(r => {
+          // considerar válidos los objetos que parecen venir del backend (tienen title y al menos posterUrl/images o un slug)
+          if (!r) return false;
+          const hasTitle = typeof r.title === 'string' && r.title.trim().length > 0;
+          const hasImage = typeof r.posterUrl === 'string' || (Array.isArray(r.images) && r.images.length > 0);
+          // algunos backends usan slug o _id; si no existen, pero hay título e imagen, considerarlo válido
+          return hasTitle && (hasImage || typeof (r as { slug?: string }).slug === 'string' || typeof (r as { _id?: string })._id === 'string');
+        });
+
+        const mapped: MovieData[] = filteredRaw.map((m) => ({
           title: m.title || 'Sin título',
           image: getImage(m),
           rating: m.rating && String(m.rating).length > 0 ? String(m.rating) : 'PG-13',
@@ -93,7 +106,7 @@ export default function HomePage() {
           description: m.description || '',
         }));
 
-        if (mounted) setMovies(mapped);
+  if (mounted) setMovies(mapped);
       } catch (err) {
         console.warn('Error al obtener películas desde', `${API_BASE}/api/movies`, err);
         // Intentar fallback relativo (si el backend está servido por el mismo host o hay proxy)
@@ -198,6 +211,12 @@ export default function HomePage() {
             </p>
           )}
         </section>
+        {/* Botón de sincronización eliminado por requerimiento */}
+        {syncing && (
+          <div className="text-center mt-6 text-orange-400 font-semibold">
+            Cargando películas...
+          </div>
+        )}
       </main>
     </div>
   );

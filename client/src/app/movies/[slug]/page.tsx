@@ -1,6 +1,21 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+let io: any = null;
+let Socket: any = null;
+const disableSocketsClient = (typeof process !== 'undefined' && process.env && (process.env.NEXT_PUBLIC_DISABLE_SOCKETS || '').toLowerCase() === '1') || (typeof window !== 'undefined' && (window as any).__DISABLE_SOCKETS__);
+if (!disableSocketsClient) {
+    try {
+        // import dinámico para evitar bundling si está deshabilitado
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        ({ io, Socket } = require('socket.io-client'));
+    } catch (e) {
+        console.warn('socket.io-client no disponible en cliente (movies page)', e);
+        io = null;
+        Socket = null;
+    }
+}
 import { API_BASE } from '@/lib/config';
 import { getPriceForHall } from '@/lib/pricing';
 import Header from "@/components/Header";
@@ -90,15 +105,21 @@ export default function MovieDetailPage() {
                                             const start = s.startAt ? new Date(s.startAt) : null;
                                             const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
                                             let hallName = 'Sala';
-                                            // Forzar que todas las salas muestren 80 asientos
-                                            const capacity = 80;
+                                            // usar la capacidad real de la sala si está disponible, fallback a 80
+                                            const capacity = (s.hall && typeof s.hall === 'object' && (s.hall as any).capacity) ? Number((s.hall as any).capacity) : 80;
                                             if (s.hall && typeof s.hall === 'object') {
                                                 hallName = (s.hall as { name?: string }).name ?? 'Sala';
                                             } else if (typeof s.hall === 'string') {
                                                 hallName = s.hall;
                                             }
-                                            const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-                                            const available = Math.max(0, capacity - seatsBooked);
+                                            // preferir availableSeats provisto por el backend cuando exista
+                                            let available: number;
+                                            if (typeof (s as any).availableSeats === 'number') {
+                                                available = (s as any).availableSeats as number;
+                                            } else {
+                                                const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
+                                                available = Math.max(0, capacity - seatsBooked);
+                                            }
                                             const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
                                             return {
                                                 time: timeStr,
@@ -141,6 +162,55 @@ export default function MovieDetailPage() {
         };
 
         fetchData();
+    }, [slug]);
+
+    // Conectar socket para recibir actualizaciones en tiempo real sobre showtimes
+    useEffect(() => {
+        if (!slug) return;
+        // Ejecutar solo en cliente
+        if (typeof window === 'undefined') return;
+        const socketUrl = window.location.origin;
+    let socket: any = null;
+        try {
+            socket = io(socketUrl, { autoConnect: true });
+            socket.on('connect', () => {
+                console.debug('movie page socket connected', socket?.id);
+            });
+            socket.on('showtimeUpdated', (payload: unknown) => {
+                try {
+                    if (!payload || typeof payload !== 'object') return;
+                    const p = payload as { _id?: string; seatsBooked?: unknown; availableSeats?: number };
+                    if (!p._id) return;
+                    // Actualizar la lista de showtimes si contiene ese id
+                    setShowtimes((prev) => {
+                        let changed = false;
+                        const next = prev.map((sh) => {
+                            if (!sh.id) return sh;
+                            if (String(sh.id) === String(p._id)) {
+                                // obtener capacidad de la sala si es posible (no está disponible en este payload)
+                                const newAvailable = typeof p.availableSeats === 'number'
+                                    ? p.availableSeats
+                                    : (Array.isArray((p as any).seatsBooked) ? Math.max(0, (sh as any).capacity - (p as any).seatsBooked.length) : sh.availableSeats);
+                                if (newAvailable !== sh.availableSeats) {
+                                    changed = true;
+                                    return { ...sh, availableSeats: newAvailable };
+                                }
+                            }
+                            return sh;
+                        });
+                        return changed ? next : prev;
+                    });
+                } catch (e) {
+                    console.error('Error procesando showtimeUpdated en movie page', e);
+                }
+            });
+        } catch (e) {
+            console.warn('No se pudo conectar socket en movie page', e);
+        }
+
+        return () => {
+            try { if (socket) socket.disconnect(); } catch {}
+        };
     }, [slug]);
 
     if (loading) {
@@ -206,18 +276,45 @@ export default function MovieDetailPage() {
     );
 }
 
+function formatMovieName(name: string) {
+    // Quitar guiones y poner mayúscula en cada palabra
+    return name
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
 function MovieShowtimeCard({ show, movieSlug }: { show: ShowTime; movieSlug: string }) {
     const router = useRouter();
 
     const handleBuy = () => {
-        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        // Evitar usar ids sintéticos que no existen en el backend (p. ej. `${slug}-gen-...`)
+        const syntheticPrefix = `${movieSlug}-gen-`;
+        if (!show.id || String(show.id).startsWith(syntheticPrefix)) {
+            // Redirigir a /comprar sin showtimeId para que la página seleccione uno real automáticamente
+            router.push(`/comprar`);
+            return;
+        }
+        const params = new URLSearchParams({ showtimeId: String(show.id) });
         router.push(`/comprar?${params.toString()}`);
     };
+
+    // Evitar mostrar la sala repetida dos veces en la misma tarjeta
+    let salaLimpia = show.sala;
+    // Si el nombre de la sala contiene el slug de la película, lo limpiamos y formateamos
+    if (salaLimpia && salaLimpia.includes('-')) {
+        const partes = salaLimpia.split(' - ');
+        if (partes.length === 2) {
+            salaLimpia = `${partes[0]} - ${formatMovieName(partes[1])}`;
+        } else {
+            salaLimpia = formatMovieName(salaLimpia);
+        }
+    }
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
             <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p>
-            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
+            <p className="text-lg mb-2 text-white font-semibold">{salaLimpia}</p>
             {/* Precio removido por petición del diseño - ya no se muestra */}
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">

@@ -92,24 +92,32 @@ mongoose.connect(MONGODB_URI)
         console.log('✅ Conectado a MongoDB');
 
             const server = http.createServer(app);
-            const io = new Server(server, {
-                cors: {
-                    origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
-                    methods: ['GET', 'POST']
-                }
-            });
+            const disableSockets = (process.env.DISABLE_SOCKETS || '').toLowerCase() === '1' || (process.env.DISABLE_SOCKETS || '').toLowerCase() === 'true';
+            if (!disableSockets) {
+                const io = new Server(server, {
+                    cors: {
+                        origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
+                        methods: ['GET', 'POST']
+                    }
+                });
 
-            // Guardar io para que otros módulos puedan emitir eventos
-            app.locals.io = io;
+                // Guardar io para que otros módulos puedan emitir eventos
+                app.locals.io = io;
 
-            io.on('connection', (socket) => {
-                console.log('Socket conectado:', socket.id);
-                socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
-            });
+                io.on('connection', (socket) => {
+                    console.log('Socket conectado:', socket.id);
+                    socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
+                });
 
-            server.listen(PORT, () => {
-                console.log(`🚀 Servidor Express + Socket.IO escuchando en el puerto ${PORT}`);
-            });
+                server.listen(PORT, () => {
+                    console.log(`🚀 Servidor Express + Socket.IO escuchando en el puerto ${PORT}`);
+                });
+            } else {
+                // Iniciar servidor sin socket.io
+                server.listen(PORT, () => {
+                    console.log(`🚀 Servidor Express (sockets DESHABILITADOS) escuchando en el puerto ${PORT}`);
+                });
+            }
     })
     .catch(err => {
         console.error('❌ ERROR al conectar a MongoDB:', err.message || err);

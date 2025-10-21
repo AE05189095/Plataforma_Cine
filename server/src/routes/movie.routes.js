@@ -5,6 +5,7 @@ const controller = require('../controllers/movieController');
 router.get('/', controller.list);
 router.get('/:slug', controller.getBySlug);
 router.post('/', controller.create);
+router.post('/sync', controller.syncFromClient);
 router.put('/:id', controller.update);
 router.delete('/:id', controller.remove);
 

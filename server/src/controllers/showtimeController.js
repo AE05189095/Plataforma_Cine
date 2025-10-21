@@ -11,7 +11,9 @@ exports.list = async (req, res) => {
       .lean();
     // Calcular asientos disponibles y ordenar seatsBooked antes de enviar
     const withAvailability = showtimes.map((st) => {
-      const seats = Array.isArray(st.seatsBooked) ? st.seatsBooked.slice() : [];
+      let seats = [];
+      if (Array.isArray(st.seatsBookedMap) && st.seatsBookedMap.length) seats = st.seatsBookedMap.map(x => x.seat);
+      else seats = Array.isArray(st.seatsBooked) ? st.seatsBooked.slice() : [];
       // orden sencillo: letras antes de números (A10 after A2)
       seats.sort((a, b) => {
         const pa = /^([A-Za-z]+)(\d+)$/.exec(String(a));
@@ -38,7 +40,9 @@ exports.get = async (req, res) => {
     if (!id) return res.status(400).json({ message: 'ID es requerido' });
     const showtime = await Showtime.findById(id).populate('movie').populate('hall').lean();
     if (!showtime) return res.status(404).json({ message: 'Función no encontrada' });
-    const seats = Array.isArray(showtime.seatsBooked) ? showtime.seatsBooked.slice() : [];
+  let seats = [];
+  if (Array.isArray(showtime.seatsBookedMap) && showtime.seatsBookedMap.length) seats = showtime.seatsBookedMap.map(x => x.seat);
+  else seats = Array.isArray(showtime.seatsBooked) ? showtime.seatsBooked.slice() : [];
     seats.sort((a, b) => {
       const pa = /^([A-Za-z]+)(\d+)$/.exec(String(a));
       const pb = /^([A-Za-z]+)(\d+)$/.exec(String(b));
