@@ -3,7 +3,6 @@
 import React, { useState, useMemo, useRef, useEffect, Dispatch, SetStateAction } from "react";
 import MovieCard from "@/components/MovieCard";
 import Header from "@/components/Header";
-// Se mantiene el import de useState como useState para evitar conflictos, aunque no se usa como useStateHook en el cuerpo principal
 import { useRouter } from "next/navigation";
 
 // Tipos
@@ -35,13 +34,13 @@ interface MovieData {
 
 // Lista de géneros
 const ALL_GENRES = [
-    "Todos los géneros",
+    "Todos los generos",
     "Comedia",
     "Accion",
     "Drama",
     "Musical",
-    "Ciencia ficción",
-    "Animación",
+    "Ciencia ficcion",
+    "Animacion",
 ];
 
 const NUM_CLICKS_TO_ACTIVATE = 8;
@@ -71,7 +70,7 @@ export default function HomePage() {
     
     // Estado de las películas y carga
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
-    const [syncing, setSyncing] = useState(false); // Mantener por si se usa en el UI
+    const [syncing, setSyncing] = useState(false);
     
     // Estado para el modo administrador
     const [logoClickCount, setLogoClickCount] = useState(0);
@@ -80,7 +79,7 @@ export default function HomePage() {
     // Limpiar timeout al desmontar
     useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
 
-    // Función para obtener la URL de la imagen (combina lógica de ambas versiones para priorizar mapeo local)
+    // Función para obtener la URL de la imagen
     const getImage = (m: RawMovie): string => {
         if (m.title) {
             const key = m.title.toLowerCase().trim();
@@ -92,6 +91,7 @@ export default function HomePage() {
         if (Array.isArray(m.images) && m.images.length) {
             const first = m.images[0];
             if (typeof first === 'string') return first;
+            // Manejar objetos dentro del array de images
             if (first && typeof first === 'object' && 'url' in first && typeof (first as Record<string, unknown>).url === 'string') return (first as Record<string, unknown>).url as string;
         }
 
@@ -110,15 +110,16 @@ export default function HomePage() {
         const loadMovies = async () => {
             try {
                 const res = await fetch(`${API_BASE}/api/movies`);
-                if (!res.ok) throw new Error("Error al obtener películas");
+                if (!res.ok) throw new Error("Error al obtener peliculas");
 
                 const data = await res.json();
-                const rawArray = Array.isArray(data) ? (data as unknown as RawMovie[]) : [];
+                // Usamos aserción para manejar la respuesta del servidor
+                const rawArray = Array.isArray(data) ? (data as RawMovie[]) : [];
 
                 const mapped: MovieData[] = rawArray.map((m) => {
                     const movieGenres = Array.isArray(m.genres) ? m.genres : [];
                     return {
-                        title: m.title || "Sin título",
+                        title: m.title || "Sin titulo",
                         image: getImage(m),
                         rating: m.rating && String(m.rating).length > 0 ? String(m.rating) : 'PG-13',
                         score: m.rating ? String(m.rating) : m.ratingCount ? String(m.ratingCount) : "N/A",
@@ -130,14 +131,14 @@ export default function HomePage() {
                     };
                 });
 
-                // Inyectar la película '200% Lobo' (de la versión Derecha)
+                // Inyectar la película '200% Lobo' (para "Proximos estrenos")
                 const newMovie: MovieData = {
                     title: "200% Lobo",
                     image: IMAGE_MAP["200% lobo"] || "/images/lobo_200.jpg",
                     rating: "G",
                     score: "5",
-                    genre: "Animación",
-                    genres: ["Animación", "Comedia"],
+                    genre: "Animacion",
+                    genres: ["Animacion", "Comedia"],
                     releaseDate: "2025-11-30",
                     duration: "95 min",
                     description: "La esperada secuela del divertido lobo y sus aventuras.",
@@ -146,17 +147,17 @@ export default function HomePage() {
                 
                 if (mounted) setAllMovies([...mapped, newMovie]);
             } catch (err) {
-                console.error("Error al cargar películas:", err);
+                console.error("Error al cargar peliculas:", err);
 
-                // Fallback en caso de error de carga (versión Derecha)
+                // Fallback en caso de error de carga
                 if (mounted && allMovies.length === 0) {
                     const fallbackMovie: MovieData = {
                         title: "200% Lobo (Fallback)",
                         image: "/images/lobo_200.jpg",
                         rating: "G",
                         score: "5",
-                        genre: "Animación",
-                        genres: ["Animación", "Comedia"],
+                        genre: "Animacion",
+                        genres: ["Animacion", "Comedia"],
                         releaseDate: "2025-11-30",
                         duration: "95 min",
                         description: "La esperada secuela del divertido lobo y sus aventuras. (Modo Fallback)",
@@ -182,7 +183,7 @@ export default function HomePage() {
         }
     }, [logoClickCount, router]);
 
-    // Lógica de Filtrado (tomada de la versión Derecha por ser más robusta para géneros)
+    // Lógica de Filtrado
     const filteredMovies = useMemo(() => {
         let current = [...allMovies];
 
@@ -193,10 +194,10 @@ export default function HomePage() {
         const selectedGenreNormalized = selectedGenre.toLowerCase().trim();
         const allGenresOptionNormalized = ALL_GENRES[0].toLowerCase().trim();
 
-        // Filtra si el género seleccionado no es "Todos los géneros"
+        // Filtra si el genero seleccionado no es "Todos los generos"
         if (selectedGenreNormalized !== allGenresOptionNormalized) {
             current = current.filter(m =>
-                // Verifica si ALGUN género de la película coincide con el seleccionado
+                // Verifica si ALGUN genero de la película coincide con el seleccionado
                 m.genres.some(g => g.toLowerCase().includes(selectedGenreNormalized))
             );
         }
@@ -224,13 +225,13 @@ export default function HomePage() {
         <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
             <Header
                 searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm as Dispatch<SetStateAction<string>>}
+                setSearchTerm={setSearchTerm} 
                 selectedGenre={selectedGenre}
-                setSelectedGenre={setSelectedGenre as Dispatch<SetStateAction<string>>}
+                setSelectedGenre={setSelectedGenre}
                 selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate as Dispatch<SetStateAction<string>>}
+                setSelectedDate={setSelectedDate}
                 onLogoClick={handleLogoClick}
-                allGenres={ALL_GENRES} // Se asume que Header necesita la lista completa de géneros
+                allGenres={ALL_GENRES} 
             />
 
             <main className="container mx-auto p-4 sm:p-8">
@@ -239,9 +240,9 @@ export default function HomePage() {
                         Cartelera CineGT
                     </h1>
                     <p className="text-xl text-gray-400">
-                        Disfruta del mejor cine en Guatemala con la experiencia cinematográfica más emocionante
+                        Disfruta del mejor cine en Guatemala con la experiencia cinematografica mas emocionante
                     </p>
-                    {/* Elementos decorativos (de la versión izquierda) */}
+                    {/* Elementos decorativos */}
                     <div className="flex justify-center gap-2 mt-4">
                         <span className="w-3 h-3 bg-red-600 rounded-full"></span>
                         <span className="w-3 h-3 bg-gray-600 rounded-full"></span>
@@ -252,7 +253,7 @@ export default function HomePage() {
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {syncing && allMovies.length === 0 ? (
                         <p className="col-span-full text-center text-xl text-orange-400 font-semibold">
-                            Cargando películas...
+                            Cargando peliculas...
                         </p>
                     ) : filteredMovies.length > 0 ? (
                         filteredMovies.map((movie, index) => (
@@ -260,7 +261,7 @@ export default function HomePage() {
                         ))
                     ) : (
                         <p className="col-span-full text-center text-xl text-gray-400">
-                            No se encontraron películas que coincidan con los filtros aplicados.
+                            No se encontraron peliculas que coincidan con los filtros aplicados.
                         </p>
                     )}
                 </section>

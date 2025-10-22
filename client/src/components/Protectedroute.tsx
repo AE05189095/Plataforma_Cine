@@ -19,7 +19,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     if (!token) {
       // incluir la ruta actual como destino para volver después de login
       try {
-        const next = window.location.pathname + window.location.search;
+        // ✅ CORRECTO: Captura la ruta y el query param (?showtimeId=...)
+        const next = window.location.pathname + window.location.search; 
         router.replace(`/login?next=${encodeURIComponent(next)}`);
       } catch {
         router.replace("/login");

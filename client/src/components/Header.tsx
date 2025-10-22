@@ -2,11 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation"; // 🚨 Importar usePathname
+import { useRouter, usePathname } from "next/navigation";
 import { API_BASE, TOKEN_KEY } from "@/lib/config";
 import { Dispatch, SetStateAction } from "react";
 
-type HeaderProps = {
+// ==========================================================
+// INTERFAZ DE PROPIEDADES CORREGIDA
+// ==========================================================
+
+export interface HeaderProps {
     searchTerm?: string;
     setSearchTerm?: Dispatch<SetStateAction<string>>;
     selectedGenre?: string;
@@ -14,20 +18,23 @@ type HeaderProps = {
     selectedDate?: string;
     setSelectedDate?: Dispatch<SetStateAction<string>>;
     onLogoClick?: () => void;
-};
+    
+    // 💥 PROPIEDAD AÑADIDA PARA CORREGIR EL ERROR TS2322 EN page.tsx
+    allGenres?: string[]; 
+}
 
 // Componente de encabezado
 export default function Header(props: HeaderProps = {}) {
     const [isLogged, setIsLogged] = useState(false);
     const router = useRouter();
-    const pathname = usePathname(); // 🚨 Hook para obtener la ruta actual
+    const pathname = usePathname();
 
     // Determina si estamos en la página de inicio
     const isHomePage = pathname === '/';
 
     // Lógica de autenticación (sin cambios)
     useEffect(() => {
-        // ... (Lógica de validación de token)
+        // Lógica de validación de token
         const validate = async () => {
             try {
                 const token = localStorage.getItem(TOKEN_KEY);
@@ -79,6 +86,22 @@ export default function Header(props: HeaderProps = {}) {
 
     // Determina si alguno de los filtros está activo
     const areFiltersActive = searchTerm !== "" || selectedGenre !== "Todos los géneros" || selectedDate !== "";
+    
+    // Lista de géneros (usando la prop pasada o una lista por defecto para la lógica del Header)
+    // Usaremos los géneros del Header para el <select>
+    const genresList = props.allGenres || [
+        "Todos los géneros",
+        "Comedia",
+        "Acción",
+        "Drama",
+        "Ciencia Ficción",
+        "Romance",
+        "Terror",
+        "Suspense",
+        "Animación",
+        "Documental",
+        "Familiar",
+    ];
 
     // FUNCIÓN PRINCIPAL: Limpia todos los filtros y navega al home
     const handleClearFilters = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -86,14 +109,14 @@ export default function Header(props: HeaderProps = {}) {
         
         // 1. Limpia el estado de los filtros
         if (setSearchTerm) setSearchTerm("");
-        if (setSelectedGenre) setSelectedGenre("Todos los géneros");
+        if (setSelectedGenre) setSelectedGenre(genresList[0] || "Todos los géneros");
         if (setSelectedDate) setSelectedDate("");
 
         // 2. Regresa a la página principal (Home)
         router.push('/');
     };
 
-    // 🚨 Nueva función para manejar el botón de regreso
+    // Nueva función para manejar el botón de regreso
     const handleGoBack = () => {
         router.back();
     };
@@ -107,7 +130,7 @@ export default function Header(props: HeaderProps = {}) {
                 {/* 1. Área Izquierda: Botón de Regreso y Logo */}
                 <div className="flex items-center space-x-3"> 
                     
-                    {/* 🚨 Botón de Regresar (visible si NO es la Home Page) */}
+                    {/* Botón de Regresar (visible si NO es la Home Page) */}
                     {!isHomePage && (
                         <button
                             onClick={handleGoBack}
@@ -150,7 +173,7 @@ export default function Header(props: HeaderProps = {}) {
                     </div>
                 </div>
 
-                {/* 2. Controles de Filtrado (Centrados) - SIN CAMBIOS */}
+                {/* 2. Controles de Filtrado (Centrados) */}
                 <div className="flex flex-col md:flex-row items-center gap-2 w-full justify-center px-0">
                     
                     {/* Contenedor de los inputs/selects */}
@@ -175,17 +198,10 @@ export default function Header(props: HeaderProps = {}) {
                             value={selectedGenre}
                             onChange={(e) => setSelectedGenre && setSelectedGenre(e.target.value)}
                         >
-                            <option value="Todos los géneros">Todas</option>
-                            <option value="Comedia">Comedia</option>
-                            <option value="Acción">Acción</option>
-                            <option value="Drama">Drama</option>
-                            <option value="Ciencia Ficción">Ciencia Ficción</option>
-                            <option value="Romance">Romance</option>
-                            <option value="Terror">Terror</option>
-                            <option value="Suspense">Suspense</option>
-                            <option value="Animación">Animación</option>
-                            <option value="Documental">Documental</option>
-                            <option value="Familiar">Familiar</option>
+                            {/* Usa la lista de géneros provista por props, o el fallback */}
+                            {genresList.map(genre => (
+                                <option key={genre} value={genre}>{genre}</option>
+                            ))}
                         </select>
                         
                         {/* Input de Fecha */}
@@ -211,7 +227,7 @@ export default function Header(props: HeaderProps = {}) {
                     )}
                 </div>
 
-                {/* 3. Botón perfil/inicio (Alineado a la derecha) - SIN CAMBIOS */}
+                {/* 3. Botón perfil/inicio (Alineado a la derecha) */}
                 <div className="flex items-center justify-end flex-shrink-0">
                     {isLogged ? (
                         <button onClick={handleProfile} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 font-semibold shadow-lg">
