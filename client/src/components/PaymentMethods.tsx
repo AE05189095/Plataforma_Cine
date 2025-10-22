@@ -1,16 +1,14 @@
 "use client";
 import React, { useState } from 'react';
 
-import { normalizePaymentPayload } from '@/lib/payment';
 
-type CardInfo = { number: string; name: string; exp: string; cvc: string };
-type PaymentPayload = { method: 'card' | 'paypal'; card?: CardInfo; paypal?: { email: string } };
+import { normalizePaymentPayload, PaymentPayload } from '@/lib/payment';
 
-type Props = {
+interface Props {
   amount: number | string;
   onCancel: () => void;
   onConfirm: (paymentInfo: PaymentPayload) => Promise<void>;
-};
+}
 
 export default function PaymentMethods({ amount, onCancel, onConfirm }: Props) {
   const [method, setMethod] = useState<'card' | 'paypal'>('card');
@@ -50,12 +48,12 @@ export default function PaymentMethods({ amount, onCancel, onConfirm }: Props) {
     setLoading(true);
     try {
       // Build raw payload then normalize to a stable shape before sending to parent
-      const raw: PaymentPayload = { method };
-      if (method === 'card') raw.card = { number: cardNumber.replace(/\s+/g, ''), name: cardName, exp: cardExp, cvc: cardCvc };
-      else raw.paypal = { email: paypalEmail };
+    const raw = { method, card: undefined as any, paypal: undefined as any };
+    if (method === 'card') raw.card = { number: cardNumber.replace(/\s+/g, ''), name: cardName, exp: cardExp, cvc: cardCvc };
+    else raw.paypal = { email: paypalEmail };
 
-      const normalized = normalizePaymentPayload(raw as any);
-      await onConfirm(normalized as any);
+    const normalized = normalizePaymentPayload(raw);
+    await onConfirm(normalized);
     } catch (e) {
       console.error(e);
       alert('Error procesando el pago');

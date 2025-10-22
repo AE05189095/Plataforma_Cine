@@ -1,3 +1,4 @@
+
 // server/index.js
 
 require('dotenv').config();
@@ -5,8 +6,8 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path'); // 🖼️ Necesario para manejar rutas de archivos estáticos
-const cookieParser = require('cookie-parser'); // 🛑 ¡NUEVO REQUIRE AGREGADO!
+const path = require('path');
+const cookieParser = require('cookie-parser');
 const { helmet, apiLimiter } = require('./src/middleware/security');
 
 const authRoutes = require('./src/routes/auth.routes.js');
@@ -17,7 +18,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
-// 🛑 Asegúrate de que tu .env contenga ALLOWED_ORIGIN=http://localhost:3000
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 // ==========================================================
@@ -25,38 +25,35 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 // ==========================================================
 
 if (ALLOWED_ORIGIN === '*' && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️  ALLOWED_ORIGIN está en "*" en producción. Considere restringirlo.');
+  console.warn('⚠️  ALLOWED_ORIGIN está en "*" en producción. Considere restringirlo.');
 }
 
-// 🛑 CONFIGURACIÓN DE CORS REVISADA (La clave es credentials: true)
+// CONFIGURACIÓN DE CORS
 app.use(
-  cors({
-    // Si ALLOWED_ORIGIN es '*', CORS lo manejará. Si es una URL específica, se usa.
-    origin: ALLOWED_ORIGIN, 
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    // 🛑 Forzamos credentials: true para permitir el envío de cookies/tokens JWT
-    credentials: true, 
-    // Los headers son importantes para Axios
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  })
+  cors({
+    origin: ALLOWED_ORIGIN,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    // CLAVE: Permite el envío de cookies/tokens JWT por el cliente
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  })
 );
 
 // Security middlewares
 app.use(helmet());
-// Aplicar rate limiter a rutas /api para proteger endpoints públicos
+// Aplicar rate limiter a rutas /api
 app.use('/api', apiLimiter);
 
 // Middleware para procesar JSON
 app.use(express.json());
 
-// 🛑 ¡CORRECCIÓN CLAVE! Este middleware puebla req.cookies para que AuthMiddleware funcione.
-app.use(cookieParser()); 
+// Middleware para procesar cookies (req.cookies)
+app.use(cookieParser());
 
 // ==========================================================
-// 🖼️ CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS (IMÁGENES)
+// CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS (IMÁGENES/UPLOADS)
 // ==========================================================
-// Permite que el navegador acceda a archivos dentro de la carpeta 'uploads'
-// Ejemplo: http://localhost:5000/uploads/poster.jpg
+// Sirve archivos desde la carpeta 'uploads'. Ej: http://localhost:5000/uploads/poster.jpg
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==========================================================
@@ -73,54 +70,65 @@ app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
 
 app.get('/', (req, res) => {
-  res.send('Servidor de Plataforma Cine en línea.');
+  res.send('Servidor de Plataforma Cine en línea.');
 });
+
+// ==========================================================
+// VERIFICACIÓN DE VARIABLES DE ENTORNO
+// ==========================================================
+
+if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
+  console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
+  process.exit(1);
+}
+
+if (typeof JWT_SECRET !== 'string' || JWT_SECRET.trim() === '') {
+  console.error('❌ ERROR: la variable de entorno JWT_SECRET no está definida o es inválida.');
+  process.exit(1);
+}
 
 // ==========================================================
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
 // ==========================================================
 
-if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
-  console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
-  console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
-  console.error('     MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
-  process.exit(1);
-}
+// Conectar a MongoDB
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log('✅ Conectado a MongoDB');
 
-if (typeof JWT_SECRET !== 'string' || JWT_SECRET.trim() === '') {
-  console.error('❌ ERROR: la variable de entorno JWT_SECRET no está definida o es inválida.');
-  console.error('Define JWT_SECRET en el archivo .env dentro de la carpeta server. Ej:');
-  console.error('     JWT_SECRET=una_clave_muy_segura');
-  process.exit(1);
-}
+    const server = http.createServer(app);
+    
+    // Lógica condicional para deshabilitar Socket.IO (tomada de HU6-Semana-2)
+    const disableSockets = (process.env.DISABLE_SOCKETS || '').toLowerCase() === '1' || (process.env.DISABLE_SOCKETS || '').toLowerCase() === 'true';
 
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => {
-    console.log('✅ Conectado a MongoDB');
+    if (!disableSockets) {
+        const io = new Server(server, {
+            cors: {
+                // Usa true si el origen es '*', de lo contrario usa la URL específica
+                origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
+                methods: ['GET', 'POST']
+            }
+        });
 
-    const server = http.createServer(app);
-    const io = new Server(server, {
-      cors: {
-        // La configuración del socket.io también debe usar el origen permitido
-        origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
-        methods: ['GET', 'POST'],
-        // Socket.io maneja sus propias credenciales/headers
-      },
-    });
+        // Guardar io en app.locals para que otros módulos (e.g., rutas) puedan emitir eventos
+        app.locals.io = io;
 
-    app.locals.io = io;
+        io.on('connection', (socket) => {
+            console.log('Socket conectado:', socket.id);
+            socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
+        });
 
-    io.on('connection', (socket) => {
-      console.log('Socket conectado:', socket.id);
-      socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
-    });
-
-    server.listen(PORT, () => {
-      console.log(`🚀 Servidor Express + Socket.IO escuchando en el puerto ${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('❌ ERROR al conectar a MongoDB:', err.message || err);
-    process.exit(1);
-  });
+        server.listen(PORT, () => {
+            console.log(`🚀 Servidor Express + Socket.IO escuchando en el puerto ${PORT}`);
+        });
+    } else {
+        // Iniciar servidor sin socket.io
+        server.listen(PORT, () => {
+            console.log(`🚀 Servidor Express (sockets DESHABILITADOS) escuchando en el puerto ${PORT}`);
+        });
+    }
+  })
+  .catch(err => {
+    console.error('❌ ERROR al conectar a MongoDB:', err.message || err);
+    process.exit(1);
+  });
