@@ -11,7 +11,6 @@ type Props = {
     selectedSeats: string[];
     currentSelectedObjects: Seat[];
     onSelectionChange?: (selected: Seat[]) => void;
-    // 🛑 Asegúrate de que esta prop esté aquí
     onMaxSelectionAttempt?: () => void; 
 };
 
@@ -42,11 +41,11 @@ export default function SeatMap({
             status = "premium"; 
         }
 
-        return { id, row, number: num, status };
+        return { id, row, number: num, status }; 
     }, [occupiedSeats, reservedSeats, rows]);
 
     const getSeatClass = (status: Seat["status"], isSelected: boolean): string => {
-        const baseClass = "w-12 h-12 rounded flex items-center justify-center text-sm font-medium border shadow-sm transition-colors duration-200";
+        const baseClass = "w-12 h-12 rounded flex items-center justify-center text-sm font-medium border shadow-sm transition-colors duration-200 cursor-pointer";
 
         if (isSelected) {
             return `${baseClass} bg-green-500 text-white border-green-500 border-2 ring-2 ring-green-300`;
@@ -66,25 +65,28 @@ export default function SeatMap({
     };
 
     const toggleSeat = (seat: Seat) => {
+        // No permitir toggle en asientos ocupados o reservados
         if (seat.status === "occupied" || seat.status === "reserved") return;
         
-        const isCurrentlySelected = selectedSeats.includes(seat.id);
+        const isCurrentlySelected = currentSelectedObjects.some(s => s.id === seat.id);
         let newSelected: Seat[];
 
         if (isCurrentlySelected) {
+            // Deseleccionar - remover el asiento
             newSelected = currentSelectedObjects.filter(s => s.id !== seat.id);
         } else {
-            // Lógica de Límite
+            // Seleccionar - agregar el asiento
             if (currentSelectedObjects.length >= MAX_SEATS) {
                 if (onMaxSelectionAttempt) {
-                    onMaxSelectionAttempt(); // Notificar al padre
+                    onMaxSelectionAttempt(); 
                 }
-                return; // Prevenir la selección
+                return; 
             }
             
             newSelected = [...currentSelectedObjects, seat];
         }
         
+        // Llamar a la función de cambio con la nueva selección
         if (onSelectionChange) {
             onSelectionChange(newSelected);
         }
@@ -117,7 +119,8 @@ export default function SeatMap({
                             {Array.from({ length: cols }, (_, i) => {
                                 const num = i + 1;
                                 const seat = makeSeat(row, num);
-                                const isSelected = selectedSeats.includes(seat.id);
+                                
+                                const isSelected = currentSelectedObjects.some(s => s.id === seat.id);
 
                                 return (
                                     <button
@@ -128,7 +131,7 @@ export default function SeatMap({
                                         title={`Asiento ${seat.id} - ${isSelected ? 'Seleccionado' : seat.status}`}
                                         aria-pressed={isSelected}
                                     >
-                                        {seat.number}
+                                        {num}
                                     </button>
                                 );
                             })}
