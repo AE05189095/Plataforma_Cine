@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+/*const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const Colab = require('../models/Colab');
@@ -79,5 +79,5 @@ const loginColab = async (req, res) => {
   }
 };
 
-module.exports = { loginController, registerController, loginAdmin, loginColab };
+module.exports = { loginController, registerController, loginAdmin, loginColab };*/
 
