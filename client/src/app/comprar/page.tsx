@@ -1,4 +1,3 @@
-// client/src/app/comprar/page.tsx
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -60,10 +59,7 @@ export default function ComprarPage() {
   // FETCH SHOWTIME
   // =============================
   const fetchShowtime = useCallback(async () => {
-    if (!showtimeId) {
-      setToast({ open: true, message: 'No se encontró el ID de la función', type: 'error' });
-      return;
-    }
+    if (!showtimeId) return;
 
     setLoading(true);
     try {
@@ -75,7 +71,10 @@ export default function ComprarPage() {
         }
       });
 
-      if (!res.ok) throw new Error(`Error ${res.status}: No se pudo cargar la función`);
+      if (!res.ok) {
+        const errMsg = await res.json().then(r => r.message).catch(() => 'No se pudo cargar la función');
+        throw new Error(`Error ${res.status}: ${errMsg}`);
+      }
 
       const data: ShowtimeResponse = await res.json();
       setShowtime(data);
@@ -85,10 +84,23 @@ export default function ComprarPage() {
     } catch (err) {
       console.error('Error fetching showtime:', err);
       setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
+      setShowtime(null);
     } finally {
       setLoading(false);
     }
   }, [showtimeId]);
+
+  // =============================
+  // VALIDACIÓN DE SHOWTIME ID
+  // =============================
+  useEffect(() => {
+    if (!showtimeId || !/^[a-f\d]{24}$/.test(showtimeId)) { // valida formato de MongoID
+      setToast({ open: true, message: 'ID de función inválido', type: 'error' });
+      setShowtime(null);
+      return;
+    }
+    fetchShowtime();
+  }, [showtimeId, fetchShowtime]);
 
   // =============================
   // LOCK SEATS
@@ -125,7 +137,6 @@ export default function ComprarPage() {
       if (data.expirationTime) {
         setExpirationTime(new Date(data.expirationTime));
       } else if (!expirationTime && seatsToLock.length > 0) {
-        // Si el backend no devuelve expiración, iniciamos 10 minutos
         const tenMinutesLater = new Date();
         tenMinutesLater.setMinutes(tenMinutesLater.getMinutes() + 10);
         setExpirationTime(tenMinutesLater);
@@ -159,7 +170,6 @@ export default function ComprarPage() {
 
     setSelected(newSelected);
 
-    // Iniciar reloj si aún no existe
     if (!expirationTime && newSelected.length > 0) {
       const tenMinutesLater = new Date();
       tenMinutesLater.setMinutes(tenMinutesLater.getMinutes() + 10);
@@ -208,13 +218,6 @@ export default function ComprarPage() {
       setToast({ open: true, message: 'Error en la compra', type: 'error' });
     }
   }, [paymentModal, router, showtimeId]);
-
-  // =============================
-  // FETCH ON LOAD
-  // =============================
-  useEffect(() => {
-    if (showtimeId) fetchShowtime();
-  }, [showtimeId, fetchShowtime]);
 
   // =============================
   // RENDER
