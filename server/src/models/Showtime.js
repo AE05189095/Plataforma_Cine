@@ -13,6 +13,9 @@ const showtimeSchema = new mongoose.Schema(
         movie: { type: mongoose.Schema.Types.ObjectId, ref: 'Movie', required: true },
         hall: { type: mongoose.Schema.Types.ObjectId, ref: 'Hall', required: true },
         startAt: { type: Date, required: true },
+        date: { type: String, required: true }, // formato 'YYYY-MM-DD'
+time: { type: String, required: true }, // formato 'HH:mm'
+
         price: { type: Number, required: true, default: 0 },
         seatsBooked: [{ type: String }], // Asientos vendidos (permanente)
         // 🛑 NUEVO CAMPO: Asientos bloqueados temporalmente

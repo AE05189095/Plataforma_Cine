@@ -246,7 +246,9 @@ export default function MovieDetailPage() {
                             sala: ensureFive[0]?.sala ?? 'Sala',
                             price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
                             availableSeats: ensureFive[0]?.availableSeats ?? 80,
+                            //id generado
                             id: `${slug}-gen-${addIndex}`,
+                            //id: undefined,// o no lo pongas
                             startISO: d.toISOString(),
                         });
                     }
@@ -356,9 +358,20 @@ function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; mo
     const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
-        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        //comprar solo si no es simulado
+      /*if (!show.id) {
+            alert("Este horario es simulado y no se puede comprar.");
+            return;
+      }
+
+        const params = new URLSearchParams({ showtimeId: show.id });
         router.push(`/comprar?${params.toString()}`);
-    };
+    */
+  const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        router.push(`/comprar?${params.toString()}`);
+};
+
+
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
