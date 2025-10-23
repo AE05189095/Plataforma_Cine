@@ -1,3 +1,4 @@
+// client/src/app/comprar/page.tsx
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -55,6 +56,9 @@ export default function ComprarPage() {
     message: '' 
   });
 
+  // =============================
+  // FETCH SHOWTIME
+  // =============================
   const fetchShowtime = useCallback(async () => {
     if (!showtimeId) {
       setToast({ open: true, message: 'No se encontró el ID de la función', type: 'error' });
@@ -71,9 +75,7 @@ export default function ComprarPage() {
         }
       });
 
-      if (!res.ok) {
-        throw new Error(`Error ${res.status}: No se pudo cargar la función`);
-      }
+      if (!res.ok) throw new Error(`Error ${res.status}: No se pudo cargar la función`);
 
       const data: ShowtimeResponse = await res.json();
       setShowtime(data);
@@ -82,26 +84,22 @@ export default function ComprarPage() {
 
     } catch (err) {
       console.error('Error fetching showtime:', err);
-      setToast({ 
-        open: true, 
-        message: 'Error al cargar la información de la función', 
-        type: 'error' 
-      });
+      setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
     } finally {
       setLoading(false);
     }
   }, [showtimeId]);
 
+  // =============================
+  // LOCK SEATS
+  // =============================
   const updateSeatLocks = useCallback(async (seatsToLock: Seat[]) => {
     if (!showtimeId) return;
-
     const seatIds = seatsToLock.map(s => s.id);
     const token = localStorage.getItem(TOKEN_KEY);
 
     try {
-      // SOLUCIÓN: Usar showtime._id en lugar del slug
       const actualShowtimeId = showtime?._id || showtimeId;
-      
       const res = await fetch(`${API_BASE}/api/purchases/showtimes/${actualShowtimeId}/lock-seats`, { 
         method: 'POST',
         headers: {
@@ -112,129 +110,115 @@ export default function ComprarPage() {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          router.push('/login');
-          return;
-        }
-        
-        // Si da 404, probablemente el endpoint no existe
+        if (res.status === 401) { router.push('/login'); return; }
         if (res.status === 404) {
           console.warn('Endpoint lock-seats no encontrado, continuando sin locks');
-          // Simular éxito para que funcione la selección
           setSelected(seatsToLock);
           return;
         }
-        
         throw new Error(`Error ${res.status} al actualizar reserva`);
       }
 
       const data = await res.json();
       setReserved(data.lockedSeats || []);
-      
+
       if (data.expirationTime) {
         setExpirationTime(new Date(data.expirationTime));
+      } else if (!expirationTime && seatsToLock.length > 0) {
+        // Si el backend no devuelve expiración, iniciamos 10 minutos
+        const tenMinutesLater = new Date();
+        tenMinutesLater.setMinutes(tenMinutesLater.getMinutes() + 10);
+        setExpirationTime(tenMinutesLater);
       }
 
-      const successfullyLockedSeats = seatsToLock.filter(s => 
-        data.userLockedSeats?.includes(s.id)
-      );
-
+      const successfullyLockedSeats = seatsToLock.filter(s => data.userLockedSeats?.includes(s.id));
       setSelected(successfullyLockedSeats);
 
     } catch (error) { 
       console.error('Error updating seat locks:', error);
-      // Si hay error, igual actualizar la selección localmente
       setSelected(seatsToLock);
     }
-  }, [showtimeId, showtime?._id, router]);
+  }, [showtime?._id, showtimeId, router, expirationTime]);
 
-  const handleSelectionChange = useCallback((newSeats: Seat[]) => {
-    // Actualizar inmediatamente para feedback visual
-    setSelected(newSeats);
-    // Luego sincronizar con el servidor
-    updateSeatLocks(newSeats);
-  }, [updateSeatLocks]);
+  // =============================
+  // HANDLE SELECTION
+  // =============================
+  const handleSelectionChange = useCallback((seat: Seat) => {
+    const isSelected = selected.some(s => s.id === seat.id);
+    let newSelected: Seat[];
 
-  const handleMaxSelectionAttempt = useCallback(() => {
-    setToast({
-      open: true,
-      message: `Máximo ${MAX_SEATS} asientos`,
-      type: 'info'
-    });
-  }, []);
+    if (isSelected) {
+      newSelected = selected.filter(s => s.id !== seat.id);
+    } else {
+      if (selected.length >= MAX_SEATS) {
+        setToast({ open: true, message: `Máximo ${MAX_SEATS} asientos`, type: 'info' });
+        return;
+      }
+      newSelected = [...selected, seat];
+    }
+
+    setSelected(newSelected);
+
+    // Iniciar reloj si aún no existe
+    if (!expirationTime && newSelected.length > 0) {
+      const tenMinutesLater = new Date();
+      tenMinutesLater.setMinutes(tenMinutesLater.getMinutes() + 10);
+      setExpirationTime(tenMinutesLater);
+    }
+
+    updateSeatLocks(newSelected);
+  }, [selected, updateSeatLocks, expirationTime]);
 
   const handleExpiration = useCallback(() => {
     setSelected([]);
     setExpirationTime(null);
-    setToast({
-      open: true,
-      message: 'Reserva expirada',
-      type: 'info'
-    });
+    setToast({ open: true, message: 'Reserva expirada', type: 'info' });
   }, []);
 
   const handlePurchase = useCallback(() => {
-    if (!showtimeId || selected.length === 0) {
+    if (selected.length === 0) {
       setToast({ open: true, message: 'Selecciona asientos primero', type: 'error' });
       return;
     }
-
     const total = selected.reduce((acc, s) => acc + (s.status === 'premium' ? 65 : 45), 0);
     setPaymentModal({ open: true, seats: selected, total });
-  }, [showtimeId, selected]);
+  }, [selected]);
 
   const handlePaymentConfirm = useCallback(async (paymentInfo: PaymentPayload) => {
-    if (!showtimeId || !paymentModal) return;
-    
+    if (!paymentModal) return;
     try {
       const token = localStorage.getItem(TOKEN_KEY);
       const res = await fetch(`${API_BASE}/api/purchases`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : ''
-        },
-        body: JSON.stringify({
-          showtimeId,
-          seats: paymentModal.seats.map(s => s.id),
-          paymentInfo
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ showtimeId, seats: paymentModal.seats.map(s => s.id), paymentInfo }),
       });
-      
       if (!res.ok) throw new Error('Error en la compra');
-      
+
       const body = await res.json();
-      
-      // Limpiar estado
       setOccupied(body.showtime?.seatsBooked || []);
       setReserved([]);
       setSelected([]);
       setExpirationTime(null);
       setPaymentModal(null);
 
-      setToast({
-        open: true,
-        message: 'Compra exitosa',
-        type: 'success'
-      });
-
+      setToast({ open: true, message: 'Compra exitosa', type: 'success' });
       setTimeout(() => router.push('/mis-compras'), 2000);
-
-    } catch (err) {
-      setToast({
-        open: true,
-        message: 'Error en la compra',
-        type: 'error'
-      });
+    } catch {
+      setToast({ open: true, message: 'Error en la compra', type: 'error' });
     }
-  }, [showtimeId, paymentModal, router]);
+  }, [paymentModal, router, showtimeId]);
 
+  // =============================
+  // FETCH ON LOAD
+  // =============================
   useEffect(() => {
-    if (showtimeId) {
-      fetchShowtime();
-    }
+    if (showtimeId) fetchShowtime();
   }, [showtimeId, fetchShowtime]);
 
+  // =============================
+  // RENDER
+  // =============================
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
@@ -242,16 +226,14 @@ export default function ComprarPage() {
         <main className="p-8">
           <div className="max-w-6xl mx-auto">
             <h1 className="text-2xl font-bold text-amber-300 mb-2">Selecciona tus asientos</h1>
-            
+
             {loading ? (
               <div className="text-slate-400 mb-4">Cargando información de la función...</div>
             ) : showtime ? (
               <div className="text-slate-400 mb-4">
                 Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —
                 Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —
-                Precio: <span className="text-white font-semibold">
-                  {formatCurrency(getPriceForHall(showtime.hall?.name))}
-                </span>
+                Precio: <span className="text-white font-semibold">{formatCurrency(getPriceForHall(showtime.hall?.name))}</span>
               </div>
             ) : (
               <div className="text-red-400 mb-4">Error al cargar la función</div>
@@ -263,22 +245,19 @@ export default function ComprarPage() {
                   occupiedSeats={occupied}
                   reservedSeats={reserved}
                   selectedSeats={selected.map(s => s.id)}
-                  onSelectionChange={handleSelectionChange}
                   currentSelectedObjects={selected}
-                  onMaxSelectionAttempt={handleMaxSelectionAttempt}
+                  onSelectionChange={handleSelectionChange}
                 />
               </div>
 
               <div className="lg:col-span-1 flex justify-center">
-                <div className="w-full max-w-sm">
-                  <ReservationSummary
-                    seats={selected}
-                    showtimeId={showtimeId}
-                    expirationTime={expirationTime}
-                    onExpiration={handleExpiration}
-                    onPurchase={handlePurchase}
-                  />
-                </div>
+                <ReservationSummary
+                  seats={selected}
+                  showtimeId={showtimeId}
+                  expirationTime={expirationTime}
+                  onExpiration={handleExpiration}
+                  onPurchase={handlePurchase}
+                />
               </div>
             </div>
           </div>
