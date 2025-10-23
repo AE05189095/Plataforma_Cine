@@ -64,6 +64,27 @@ export default function ComprarPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem(TOKEN_KEY);
+
+      // ✅ Manejo de IDs simulados
+      if (showtimeId.includes("-gen-")) {
+        const simulatedStart = new Date();
+        simulatedStart.setHours(simulatedStart.getHours() + 1);
+        const simulated: ShowtimeResponse = {
+          _id: showtimeId,
+          movie: { title: showtimeId.split("-gen-")[0].replace(/-/g, " ") },
+          hall: { name: "Sala 1" },
+          startAt: simulatedStart.toISOString(),
+          seatsBooked: [],
+          seatsLocked: [],
+        };
+        setShowtime(simulated);
+        setOccupied(simulated.seatsBooked ?? []);
+        setReserved(simulated.seatsLocked ?? []);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch real desde backend
       const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}`, { 
         headers: { 
           'Authorization': token ? `Bearer ${token}` : '',
@@ -78,8 +99,8 @@ export default function ComprarPage() {
 
       const data: ShowtimeResponse = await res.json();
       setShowtime(data);
-      setOccupied(data.seatsBooked || []);
-      setReserved(data.seatsLocked || []);
+      setOccupied(data.seatsBooked ?? []);
+      setReserved(data.seatsLocked ?? []);
 
     } catch (err) {
       console.error('Error fetching showtime:', err);
@@ -94,11 +115,7 @@ export default function ComprarPage() {
   // VALIDACIÓN DE SHOWTIME ID
   // =============================
   useEffect(() => {
-    if (!showtimeId || !/^[a-f\d]{24}$/.test(showtimeId)) { // valida formato de MongoID
-      setToast({ open: true, message: 'ID de función inválido', type: 'error' });
-      setShowtime(null);
-      return;
-    }
+    if (!showtimeId) return;
     fetchShowtime();
   }, [showtimeId, fetchShowtime]);
 
@@ -106,13 +123,16 @@ export default function ComprarPage() {
   // LOCK SEATS
   // =============================
   const updateSeatLocks = useCallback(async (seatsToLock: Seat[]) => {
-    if (!showtimeId) return;
+    if (!showtimeId || !showtime) return;
+
+    // ignoramos simulados
+    if (showtimeId.includes("-gen-")) return;
+
     const seatIds = seatsToLock.map(s => s.id);
     const token = localStorage.getItem(TOKEN_KEY);
 
     try {
-      const actualShowtimeId = showtime?._id || showtimeId;
-      const res = await fetch(`${API_BASE}/api/purchases/showtimes/${actualShowtimeId}/lock-seats`, { 
+      const res = await fetch(`${API_BASE}/api/purchases/showtimes/${showtime._id}/lock-seats`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,15 +144,14 @@ export default function ComprarPage() {
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return; }
         if (res.status === 404) {
-          console.warn('Endpoint lock-seats no encontrado, continuando sin locks');
           setSelected(seatsToLock);
           return;
         }
         throw new Error(`Error ${res.status} al actualizar reserva`);
       }
 
-      const data = await res.json();
-      setReserved(data.lockedSeats || []);
+      const data: { lockedSeats?: string[]; userLockedSeats?: string[]; expirationTime?: string } = await res.json();
+      setReserved(data.lockedSeats ?? []);
 
       if (data.expirationTime) {
         setExpirationTime(new Date(data.expirationTime));
