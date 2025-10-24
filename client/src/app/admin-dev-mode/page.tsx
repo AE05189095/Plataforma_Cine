@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import React from "react";
+import AdminReservationTable from '@/components/AdminReservationTable';
 
 export default function AdminDevMode() {
   const router = useRouter();

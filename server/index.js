@@ -67,6 +67,9 @@ app.use('/api/auth', authRoutes);
 const movieRoutes = require('./src/routes/movie.routes');
 const showtimeRoutes = require('./src/routes/showtime.routes');
 const purchaseRoutes = require('./src/routes/purchase.routes');
+//rutas de reservaciones
+app.use('/api/reservations', require('./routes/reservation.routes'));
+
 
 app.use('/api/movies', movieRoutes);
 app.use('/api/showtimes', showtimeRoutes);
