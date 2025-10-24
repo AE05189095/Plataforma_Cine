@@ -56,6 +56,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
+//rutas de reservaciones
+app.use('/api/reservations', require('./routes/reservation.routes'));
+
 
 app.get('/', (req, res) => {
   res.send('Servidor de Plataforma Cine en línea.');
