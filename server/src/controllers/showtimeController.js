@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const Showtime = require('../models/Showtime');
+const Hall = require('../models/Hall'); // ✅ Importar modelo Hall
 
 // Duración del bloqueo en minutos
 const LOCK_DURATION_MINUTES = 10;
 
-// Ordena asientos tipo "A1, A2, B1"
+// Función para ordenar asientos tipo "A1, A2, B1"
 const sortSeats = (seats) => {
   seats.sort((a, b) => {
     const pa = /^([A-Za-z]+)(\d+)$/.exec(String(a));
@@ -34,7 +35,10 @@ const getLockedSeats = (showtime, currentUserId) => {
     }
   }
 
-  return { seatsLocked: Array.from(new Set(allLockedSeats)), userLockedSeats: Array.from(new Set(userLockedSeats)) };
+  return {
+    seatsLocked: Array.from(new Set(allLockedSeats)),
+    userLockedSeats: Array.from(new Set(userLockedSeats))
+  };
 };
 
 // ==========================================================
@@ -44,7 +48,7 @@ exports.list = async (req, res) => {
   try {
     const showtimes = await Showtime.find({ isActive: true })
       .populate('movie')
-      .populate('hall')
+      .populate('hall') // ✅ Ahora Hall está registrado
       .sort({ startAt: 1 })
       .lean();
 
@@ -52,7 +56,11 @@ exports.list = async (req, res) => {
       const seats = Array.isArray(st.seatsBooked) ? st.seatsBooked.slice() : [];
       sortSeats(seats);
       const capacity = st.hall?.capacity || 0;
-      return { ...st, seatsBooked: seats, availableSeats: Math.max(0, capacity - seats.length) };
+      return {
+        ...st,
+        seatsBooked: seats,
+        availableSeats: Math.max(0, capacity - seats.length)
+      };
     });
 
     res.json(withAvailability);
@@ -71,10 +79,8 @@ exports.get = async (req, res) => {
     let showtime;
 
     if (mongoose.isValidObjectId(id)) {
-      // Buscar por _id
       showtime = await Showtime.findById(id).populate('movie').populate('hall').lean();
     } else {
-      // Buscar por slug
       showtime = await Showtime.findOne({ slug: id }).populate('movie').populate('hall').lean();
     }
 
@@ -91,7 +97,7 @@ exports.get = async (req, res) => {
       ...showtime,
       seatsBooked: booked,
       seatsLocked,
-      availableSeats: Math.max(0, capacity - allOccupiedSeats.length),
+      availableSeats: Math.max(0, capacity - allOccupiedSeats.length)
     });
   } catch (err) {
     console.error('showtimeController.get ERROR:', err);
@@ -113,7 +119,6 @@ exports.lockSeats = async (req, res) => {
     if (!Array.isArray(seatIds)) seatIds = [];
     seatIds = Array.from(new Set(seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)));
 
-    // Buscar showtime por ID o slug
     let showtime;
     if (mongoose.isValidObjectId(showtimeId)) {
       showtime = await Showtime.findById(showtimeId);
@@ -154,7 +159,7 @@ exports.lockSeats = async (req, res) => {
     res.json({
       lockedSeats: seatsLocked,
       userLockedSeats,
-      expirationTime: userLockedSeats.length > 0 ? newExpiration.toISOString() : null,
+      expirationTime: userLockedSeats.length > 0 ? newExpiration.toISOString() : null
     });
 
   } catch (err) {
