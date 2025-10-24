@@ -1,6 +1,10 @@
 // backend/models/Showtime.js
 const mongoose = require('mongoose');
 
+// ✅ Importar los modelos referenciados (para evitar MissingSchemaError)
+require('./Movie');
+require('./Hall');
+
 // Definición del esquema para un bloqueo individual
 const seatLockSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
