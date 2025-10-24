@@ -15,7 +15,7 @@ export const sendConfirmationEmail = async (to, purchaseDetails) => {
   const { movie, date, time, room, seat, total, code } = purchaseDetails;
 
   const mailOptions = {
-    from: testAccount.user,
+    from: `"CineGT" <${testAccount.user}>`,
     to,
     subject: 'Confirmación de compra - Plataforma Cine',
     html: `
@@ -29,7 +29,7 @@ export const sendConfirmationEmail = async (to, purchaseDetails) => {
           <li><strong>Hora:</strong> ${time}</li>
           <li><strong>Sala:</strong> ${room}</li>
           <li><strong>Asientos:</strong> ${seat}</li>
-          <li><strong>Total Pagado:</strong> $${total}</li>
+          <li><strong>Total Pagado:</strong> Q${total}</li>
           <li><strong>Código:</strong> <span style="color:#E63946;">${code}</span></li>
         </ul>
         <p>Nos vemos en el cine 🍿</p>

@@ -2,8 +2,7 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const Movie = require('../models/Movie'); // 🛑 Import necesario
-// correo de confirmación
+const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 
 // ==========================================================
@@ -32,12 +31,9 @@ exports.lockSeats = async (req, res) => {
     const userLockedSeats = normalizedSeatIds;
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
-    // Emitir evento sockets
     try {
       const io = req.app.get('io');
-      if (io) {
-        io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
-      }
+      if (io) io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
     } catch (e) {
       console.error('Error emitiendo seatsLocked:', e);
     }
@@ -74,29 +70,28 @@ exports.create = async (req, res) => {
     seats = Array.from(new Set(seats));
 
     let showtime = null;
-    let movieTitle = null; // 🛑 Nuevo: título real de la película
+    let movieTitle = null;
     const isSimulated = !mongoose.Types.ObjectId.isValid(showtimeId) || showtimeId.includes('-gen-');
 
     if (isSimulated) {
-      // Extraer slug real de showtime simulado
       const slugMatch = showtimeId.match(/^(.+)-gen-/);
       const movieSlug = slugMatch ? slugMatch[1] : null;
-
       if (movieSlug) {
         const movieDoc = await Movie.findOne({ slug: movieSlug }).lean();
         movieTitle = movieDoc?.title || 'Película Desconocida';
       } else {
         movieTitle = 'Película Desconocida';
       }
-
+      const todayStr = new Date().toISOString().split('T')[0];
       showtime = {
         _id: showtimeId,
         seatsBooked: [],
         price: 45,
-        date: '2025-10-23',
+        date: todayStr,
         time: '18:30',
         hall: { name: 'Sala Virtual', capacity: 100 },
         movie: { title: movieTitle },
+        startAt: new Date(`${todayStr}T18:30`)
       };
     } else {
       await Showtime.findByIdAndUpdate(
@@ -108,7 +103,7 @@ exports.create = async (req, res) => {
       showtime = await Showtime.findById(showtimeId)
         .populate('movie')
         .populate('hall')
-        .select('movie hall date time price seatsBooked')
+        .select('movie hall startAt date time price seatsBooked')
         .session(session);
 
       if (!showtime) {
@@ -119,7 +114,16 @@ exports.create = async (req, res) => {
       movieTitle = showtime.movie?.title || 'Película Desconocida';
     }
 
-    const totalPrice = (showtime.price || 45) * seats.length;
+    // ==========================================================
+    // Cálculo total según fila de asiento
+    // ==========================================================
+    let totalQ = 0;
+    // Aquí defines los precios por fila (ajusta según tu sala)
+    const priceMap = { A: 65, B: 65, C: 55, D: 55, E: 45, F: 45, G: 45, H: 45 };
+    seats.forEach(seatId => {
+      const row = seatId[0].toUpperCase();
+      totalQ += priceMap[row] || 45;
+    });
 
     // Sanitizar paymentInfo
     let safePayment = {};
@@ -153,7 +157,7 @@ exports.create = async (req, res) => {
       user: userId,
       showtime: showtimeId,
       seats,
-      totalPrice,
+      totalPrice: totalQ,
       status: 'reserved',
       paymentInfo: safePayment,
       confirmationCode,
@@ -166,9 +170,8 @@ exports.create = async (req, res) => {
     try {
       const io = req.app.get('io');
       if (io) {
-        let freshShowtime = await Showtime.findById(showtimeId).lean();
+        const freshShowtime = await Showtime.findById(showtimeId).lean();
         const occupiedSeats = freshShowtime?.seatsBooked || [];
-
         io.emit('showtimeUpdated', {
           _id: showtimeId,
           seatsBooked: [...occupiedSeats],
@@ -180,23 +183,29 @@ exports.create = async (req, res) => {
       console.error('Error emitiendo eventos:', e);
     }
 
-    // Enviar correo de confirmación
-    const fresh = {
-      movie: showtime.movie,
-      hall: showtime.hall,
-      startAt: new Date(`${showtime.date}T${showtime.time}`),
-    };
+    // ==========================================================
+    // Preparar fecha y hora para correo
+    // ==========================================================
+    let showtimeDate = showtime.startAt instanceof Date && !isNaN(showtime.startAt)
+      ? showtime.startAt
+      : new Date(`${showtime.date}T${showtime.time}`);
+
+    let formattedDate = showtimeDate.toLocaleDateString('es-GT', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+    let formattedTime = showtimeDate.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const userEmail = req.user?.email || 'correo@falso.com';
 
+    // Enviar correo
     try {
       await sendConfirmationEmail(userEmail, {
         movie: movieTitle,
-        date: fresh.startAt.toLocaleDateString('es-ES'),
-        time: fresh.startAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        room: fresh.hall.name,
+        date: formattedDate,
+        time: formattedTime,
+        room: showtime.hall?.name || 'Sala desconocida',
         seat: createdPurchase[0].seats.join(', '),
-        total: createdPurchase[0].totalPrice,
+        total: totalQ.toFixed(2),
         code: confirmationCode
       });
       await Purchase.findByIdAndUpdate(createdPurchase[0]._id, { emailSent: true });
