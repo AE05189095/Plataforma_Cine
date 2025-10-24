@@ -2,21 +2,21 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const SeatLock = require('../models/SeatLock');
-//correo de confirmacion
-const {sendConfirmationEmail} = require('../utils/sendEmail');
+const Movie = require('../models/Movie'); // 🛑 Import necesario
+// correo de confirmación
+const { sendConfirmationEmail } = require('../utils/sendEmail');
 
-
-// Lock/Unlock de asientos
+// ==========================================================
+// LOCK DE ASIENTOS
+// ==========================================================
 exports.lockSeats = async (req, res) => {
   try {
     const { showtimeId } = req.params;
     const { seatIds } = req.body;
-    const userId = req.user._id;
-
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: 'No autenticado' });
     if (!showtimeId) return res.status(400).json({ message: 'Showtime ID es requerido' });
 
-    // Para modo demo - si showtimeId es simulado
     let showtimeExists = true;
     if (showtimeId.includes('-gen-')) showtimeExists = false;
     else {
@@ -53,13 +53,15 @@ exports.lockSeats = async (req, res) => {
   }
 };
 
-// Crear una compra (reserva)
+// ==========================================================
+// CREAR COMPRA (RESERVA)
+// ==========================================================
 exports.create = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
 
-    const userId = req.user._id;
+    const userId = req.user?._id;
     const { showtimeId, paymentInfo } = req.body;
     let { seats } = req.body;
 
@@ -68,50 +70,55 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: 'Datos incompletos' });
     }
 
-    // Normalizar asientos
     seats = seats.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     seats = Array.from(new Set(seats));
 
     let showtime = null;
-
+    let movieTitle = null; // 🛑 Nuevo: título real de la película
     const isSimulated = !mongoose.Types.ObjectId.isValid(showtimeId) || showtimeId.includes('-gen-');
-console.log('🧪 Showtime ID:', showtimeId);
-console.log('🧪 Es simulado:', isSimulated);
 
+    if (isSimulated) {
+      // Extraer slug real de showtime simulado
+      const slugMatch = showtimeId.match(/^(.+)-gen-/);
+      const movieSlug = slugMatch ? slugMatch[1] : null;
 
-if (isSimulated) {
-  showtime = {
-    _id: showtimeId,
-    seatsBooked: [],
-    price: 45,
-    date: '2025-10-23',
-    time: '18:30',
-    hall: { name: 'Sala Demo', capacity: 100 },
-    movie: { title: 'Película Demo' },
-  };
-} else {
-  await Showtime.findByIdAndUpdate(
-    showtimeId,
-    { $push: { seatsBooked: { $each: seats } } },
-    { session }
-  );
+      if (movieSlug) {
+        const movieDoc = await Movie.findOne({ slug: movieSlug }).lean();
+        movieTitle = movieDoc?.title || 'Película Desconocida';
+      } else {
+        movieTitle = 'Película Desconocida';
+      }
 
-  showtime = await Showtime.findById(showtimeId)
-    .populate('movie')
-    .populate('hall')
-    .select('movie hall date time price seatsBooked')
-    .session(session);
+      showtime = {
+        _id: showtimeId,
+        seatsBooked: [],
+        price: 45,
+        date: '2025-10-23',
+        time: '18:30',
+        hall: { name: 'Sala Virtual', capacity: 100 },
+        movie: { title: movieTitle },
+      };
+    } else {
+      await Showtime.findByIdAndUpdate(
+        showtimeId,
+        { $push: { seatsBooked: { $each: seats } } },
+        { session }
+      );
 
-  if (!showtime) {
-    await session.abortTransaction();
-    return res.status(404).json({ message: 'Showtime no encontrado' });
-  }
-}
+      showtime = await Showtime.findById(showtimeId)
+        .populate('movie')
+        .populate('hall')
+        .select('movie hall date time price seatsBooked')
+        .session(session);
 
+      if (!showtime) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Showtime no encontrado' });
+      }
 
+      movieTitle = showtime.movie?.title || 'Película Desconocida';
+    }
 
-
-    // Calcular total
     const totalPrice = (showtime.price || 45) * seats.length;
 
     // Sanitizar paymentInfo
@@ -159,11 +166,13 @@ if (isSimulated) {
     try {
       const io = req.app.get('io');
       if (io) {
-        const seatsArr = [...occupiedSeats, ...seats];
+        let freshShowtime = await Showtime.findById(showtimeId).lean();
+        const occupiedSeats = freshShowtime?.seatsBooked || [];
+
         io.emit('showtimeUpdated', {
           _id: showtimeId,
-          seatsBooked: seatsArr,
-          availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - seatsArr.length),
+          seatsBooked: [...occupiedSeats],
+          availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - occupiedSeats.length),
         });
         io.emit('seatsLocked', { showtimeId, seats: [] });
       }
@@ -172,36 +181,29 @@ if (isSimulated) {
     }
 
     // Enviar correo de confirmación
-    console.log('🎬 Película:', showtime.movie?.title);
-console.log('📅 Fecha:', showtime.date);
-console.log('🕒 Hora:', showtime.time);
-
-
     const fresh = {
-  movie: showtime.movie,
-  hall: showtime.hall,
-  startAt: new Date(`${showtime.date}T${showtime.time}`),
-};
+      movie: showtime.movie,
+      hall: showtime.hall,
+      startAt: new Date(`${showtime.date}T${showtime.time}`),
+    };
 
-const userEmail = req.user.email || 'correo@falso.com';
+    const userEmail = req.user?.email || 'correo@falso.com';
 
-console.log('🕒 Fecha:', showtime.date);
-console.log('🕒 Hora:', showtime.time);
-try {
-  await sendConfirmationEmail(userEmail, {
-    
-    movie: fresh.movie.title,
-    date: fresh.startAt.toLocaleDateString('es-ES'),
-    time: fresh.startAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }),
-    room: fresh.hall.name,
-    seat: createdPurchase[0].seats.join(', '),
-    total: createdPurchase[0].totalPrice,
-    code: confirmationCode
-  });
-  await Purchase.findByIdAndUpdate(createdPurchase[0]._id, { emailSent: true });
-} catch (emailErr) {
-  console.error('❌ Error al enviar correo de confirmación:', emailErr);
-}
+    try {
+      await sendConfirmationEmail(userEmail, {
+        movie: movieTitle,
+        date: fresh.startAt.toLocaleDateString('es-ES'),
+        time: fresh.startAt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        room: fresh.hall.name,
+        seat: createdPurchase[0].seats.join(', '),
+        total: createdPurchase[0].totalPrice,
+        code: confirmationCode
+      });
+      await Purchase.findByIdAndUpdate(createdPurchase[0]._id, { emailSent: true });
+    } catch (emailErr) {
+      console.error('❌ Error al enviar correo de confirmación:', emailErr);
+    }
+
     res.status(201).json({ purchase: createdPurchase[0] });
   } catch (err) {
     console.error('Error creando compra:', err);
@@ -209,15 +211,15 @@ try {
     res.status(500).json({ message: err.message || 'Error interno del servidor al crear compra' });
   } finally {
     session.endSession();
-  } 
+  }
 };
 
-
-
-// Obtener compras de un usuario
+// ==========================================================
+// OBTENER COMPRAS DE UN USUARIO
+// ==========================================================
 exports.listByUser = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?._id;
     const purchases = await Purchase.find({ user: userId })
       .populate({
         path: 'showtime',
@@ -235,4 +237,3 @@ exports.listByUser = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener las compras' });
   }
 };
-

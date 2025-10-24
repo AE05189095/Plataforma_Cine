@@ -1,8 +1,9 @@
+// server/src/controllers/showtimeController.js
 const mongoose = require('mongoose');
 const Showtime = require('../models/Showtime');
 
-// Duración del bloqueo en minutos
 const LOCK_DURATION_MINUTES = 10;
+const CLEANUP_INTERVAL_MS = 30 * 1000; // cada 30 segundos limpiar locks expirados
 
 // Ordena asientos tipo "A1, A2, B1"
 const sortSeats = (seats) => {
@@ -38,6 +39,35 @@ const getLockedSeats = (showtime, currentUserId) => {
 };
 
 // ==========================================================
+// LIMPIEZA AUTOMÁTICA DE LOCKS EXPIRADOS
+// ==========================================================
+const cleanupExpiredLocks = async () => {
+  const now = new Date();
+  try {
+    const showtimes = await Showtime.find({ 'seatsLocks.0': { $exists: true } });
+    for (const showtime of showtimes) {
+      const originalLocks = showtime.seatsLocks.length;
+      showtime.seatsLocks = (showtime.seatsLocks || []).filter(lock => lock.expiresAt > now);
+      if (showtime.seatsLocks.length !== originalLocks) {
+        await showtime.save();
+        // Emitir evento a todos los clientes conectados para actualizar UI
+        if (showtime?.hall && showtime?.movie) {
+          const io = require('../../index').io || showtime.io || null;
+          if (io) {
+            io.emit(`updateLockedSeats-${showtime._id}`, getLockedSeats(showtime));
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error limpiando locks expirados:', err);
+  }
+};
+
+// Ejecutar limpieza automática cada intervalo
+setInterval(cleanupExpiredLocks, CLEANUP_INTERVAL_MS);
+
+// ==========================================================
 // LISTAR FUNCIONES
 // ==========================================================
 exports.list = async (req, res) => {
@@ -71,10 +101,8 @@ exports.get = async (req, res) => {
     let showtime;
 
     if (mongoose.isValidObjectId(id)) {
-      // Buscar por _id
       showtime = await Showtime.findById(id).populate('movie').populate('hall').lean();
     } else {
-      // Buscar por slug
       showtime = await Showtime.findOne({ slug: id }).populate('movie').populate('hall').lean();
     }
 
@@ -113,7 +141,6 @@ exports.lockSeats = async (req, res) => {
     if (!Array.isArray(seatIds)) seatIds = [];
     seatIds = Array.from(new Set(seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)));
 
-    // Buscar showtime por ID o slug
     let showtime;
     if (mongoose.isValidObjectId(showtimeId)) {
       showtime = await Showtime.findById(showtimeId);
@@ -150,6 +177,11 @@ exports.lockSeats = async (req, res) => {
 
     const freshShowtime = await Showtime.findById(showtime._id).lean();
     const { seatsLocked, userLockedSeats } = getLockedSeats(freshShowtime, req.user._id);
+
+    // Emitir evento a todos los clientes conectados
+    if (req.app.locals.io) {
+      req.app.locals.io.emit(`updateLockedSeats-${showtime._id}`, { seatsLocked });
+    }
 
     res.json({
       lockedSeats: seatsLocked,
@@ -194,6 +226,11 @@ exports.reserveSeats = async (req, res) => {
     const seatsArr = updated.seatsBooked.slice();
     sortSeats(seatsArr);
     const capacity = updated.hall?.capacity || 0;
+
+    // Emitir evento a todos los clientes conectados
+    if (req.app.locals.io) {
+      req.app.locals.io.emit(`updateReservedSeats-${showtime._id}`, { seatsBooked: seatsArr });
+    }
 
     res.json({ ...updated, seatsBooked: seatsArr, availableSeats: Math.max(0, capacity - seatsArr.length) });
 
