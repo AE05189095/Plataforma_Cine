@@ -1,0 +1,10 @@
+const express = require('express'); 
+const router = express.Router(); 
+const Reserva = require('../models/Reserva'); 
+router.get('/', async (req, res) => { try { const filtros = {}; 
+if (req.query.estado) filtros.estado = req.query.estado; 
+if (req.query.fecha) filtros.fecha = new Date(req.query.fecha); 
+if (req.query.cliente) filtros.cliente = req.query.cliente; 
+const reservas = await Reserva.find(filtros); res.json(reservas); 
+} catch (err) { res.status(500).json({ message: err.message }); } }); 
+module.exports = router; 
