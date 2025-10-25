@@ -1,8 +1,17 @@
-const mongoose = require('mongoose'); 
-const reservaSchema = new mongoose.Schema({ 
-    cliente: String, estado: String, 
-    // pendiente, confirmada, cancelada 
-    // fecha: Date, tipoVenta: String 
-    // // opcional }); 
-    // module.exports = mongoose.model('Reserva', reservaSchema); 
-    })
+const mongoose = require('mongoose');
+
+const reservaSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    showtimeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Showtime', required: true },
+    seats: [{ type: String }],
+    totalPrice: Number,
+    createdAt: { type: Date, default: Date.now },
+    estado: {
+        type: String,
+        enum: ['pendiente', 'confirmada', 'cancelada'],
+        default: 'pendiente'
+    }
+});
+
+
+module.exports = mongoose.model('Reservation', reservaSchema);

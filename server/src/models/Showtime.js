@@ -30,6 +30,6 @@ const showtimeSchema = new mongoose.Schema(
 );
 
 // Índice TTL para limpiar locks automáticamente según expiresAt
-showtimeSchema.index({ 'seatsLocks.expiresAt': 1 }, { expireAfterSeconds: 0 });
+//showtimeSchema.index({ 'seatsLocks.expiresAt': 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Showtime', showtimeSchema);

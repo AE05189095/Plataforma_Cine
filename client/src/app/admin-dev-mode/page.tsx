@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import React from "react";
-import AdminReservationTable from '@/components/AdminReservationTable';
+import ReservasPanel from "../../components/ReservasPanel";
+
+
 
 
 export default function AdminDevMode() {
@@ -39,3 +41,21 @@ export default function AdminDevMode() {
     </div>
   );
 }
+
+/*
+"use client";
+
+import React from "react";
+import ReservasPanel from "../../components/ReservasPanel";
+
+export default function AdminDevPanel() {
+  return (
+    <div className="min-h-screen bg-black text-white p-6">
+      <h1 className="text-3xl font-bold mb-6 text-orange-500 text-center">
+         
+      </h1>
+      <ReservasPanel />
+    </div>
+  );
+}
+*/
