@@ -1,4 +1,4 @@
-"use client";
+/*"use client";
 
 import { useRouter } from "next/navigation";
 import React from "react";
@@ -41,8 +41,8 @@ export default function AdminDevMode() {
     </div>
   );
 }
+*/
 
-/*
 "use client";
 
 import React from "react";
@@ -58,4 +58,3 @@ export default function AdminDevPanel() {
     </div>
   );
 }
-*/

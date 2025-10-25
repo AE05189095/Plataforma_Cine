@@ -86,6 +86,7 @@ export default function ReservasPanel() {
         createdAt: '2025-10-26T18:00:00Z',
       },
     ];
+    
 
     const filtradas = datosSimulados.filter((r) => {
       const concideId = filtros.id === '' || r._id.includes(filtros.id);

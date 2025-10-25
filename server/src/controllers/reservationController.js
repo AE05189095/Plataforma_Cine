@@ -1,8 +1,7 @@
 const Reservation = require('../models/Reserva.js');
 
 exports.getReservations = async (req, res) => {
-
-  const { movie, date, user } = req.query;
+  const { movie, date, user, estado } = req.query;
   const filters = {};
 
   if (movie) filters['showtimeId.movieId.title'] = movie;
@@ -10,12 +9,14 @@ exports.getReservations = async (req, res) => {
   if (user) filters['userId.email'] = user;
   if (estado) filters.estado = estado;
 
-
-  const reservations = await Reservation.find()
+  const reservations = await Reservation.find(filters)
     .populate('userId', 'email')
     .populate({
       path: 'showtimeId',
-      populate: [{ path: 'movieId', select: 'title' }, { path: 'hallId', select: 'name' }]
+      populate: [
+        { path: 'movieId', select: 'title' },
+        { path: 'hallId', select: 'name' }
+      ]
     });
 
   res.json(reservations);
