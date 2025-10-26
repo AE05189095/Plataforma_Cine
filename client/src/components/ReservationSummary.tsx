@@ -1,68 +1,89 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '@/lib/format';
 
 type Seat = {
-  id: string;
-  row: string;
-  number: number;
-  status: string;
+    id: string;
+    row: string;
+    number: number;
+    status: string;
 };
 
-type Props = {
-  seats: Seat[];
-  showtimeId?: string | null;
-  onPurchase?: (seatIds: string[]) => Promise<void>;
-};
+interface ReservationSummaryProps {
+    seats: Seat[];
+    showtimeId: string | null;
+    expirationTime: Date | null; 
+    onExpiration: () => void;
+    onPurchase: () => void;
+}
 
-export default function ReservationSummary({ seats, showtimeId, onPurchase }: Props) {
-  const PRICE_REGULAR = 45;
-  const PRICE_PREMIUM = 65;
-  const priceForSeat = (s: Seat) => (s.status === 'premium' ? PRICE_PREMIUM : PRICE_REGULAR);
-  const total = seats.reduce((acc, s) => acc + priceForSeat(s), 0);
+const calculateTotal = (seats: Seat[]) =>
+    seats.reduce((acc, s) => acc + (s.status === 'premium' ? 65 : 45), 0);
 
-  return (
-    <aside className="bg-gray-900 p-6 rounded-xl text-sm border border-gray-700 shadow-lg">
-      <h3 className="text-lg font-semibold text-amber-300 mb-3">Resumen de reserva</h3>
-      {seats.length === 0 ? (
-        <div className="text-slate-400">Selecciona al menos un asiento para continuar</div>
-      ) : (
-        <div className="space-y-2">
-          <ul className="divide-y divide-slate-700 max-h-48 overflow-auto">
-            {seats.map((s) => (
-              <li key={s.id} className="py-2 flex justify-between">
-                <div>
-                  <div className="font-medium text-white">Asiento {s.id}</div>
-                  <div className="text-slate-400 text-xs">{s.status}</div>
-                </div>
-                <div className="text-amber-300">{formatCurrency(priceForSeat(s))}</div>
-              </li>
-            ))}
-          </ul>
+const CountdownTimer = ({ expirationTime, onExpiration }: { expirationTime: Date, onExpiration: () => void }) => {
+    const [timeLeft, setTimeLeft] = useState(Math.max(0, Math.floor((expirationTime.getTime() - new Date().getTime()) / 1000)));
 
-          <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
-            <div className="text-gray-400">Total</div>
-            <div className="text-amber-300 font-semibold">{formatCurrency(total)}</div>
-          </div>
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const diff = Math.max(0, Math.floor((expirationTime.getTime() - new Date().getTime()) / 1000));
+            setTimeLeft(diff);
 
-          <button
-            aria-label="Comprar entradas"
-            className="mt-3 w-full bg-red-600 text-white py-2 rounded-xl font-semibold hover:bg-red-700 disabled:opacity-60"
-            disabled={seats.length === 0}
-            onClick={async () => {
-              if (!showtimeId || !onPurchase) return window.alert('No se puede procesar la compra');
-              const seatIds = seats.map(s => s.id);
-              try {
-                await onPurchase(seatIds);
-              } catch {
-                window.alert('Error al reservar');
-              }
-            }}
-          >
-            Comprar
-          </button>
+            if (diff <= 0) {
+                clearInterval(timer);
+                onExpiration();
+            }
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [expirationTime, onExpiration]);
+
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+
+    return (
+        <div className="p-3 bg-red-800 rounded-lg text-white font-bold text-center border-2 border-red-500 shadow-lg">
+            Tiempo de Reserva: {minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}
         </div>
-      )}
-    </aside>
-  );
+    );
+};
+
+export default function ReservationSummary({ seats, showtimeId, expirationTime, onExpiration, onPurchase }: ReservationSummaryProps) {
+    const total = calculateTotal(seats);
+
+    return (
+        <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 w-full">
+            <h2 className="text-xl font-bold mb-4 text-amber-400 border-b border-gray-600 pb-2">Resumen de Reserva</h2>
+
+            {/* Mostrar el contador solo si hay asientos y expirationTime */}
+            {seats.length > 0 && expirationTime && (
+                <div className="mb-4">
+                    <CountdownTimer expirationTime={expirationTime} onExpiration={onExpiration} />
+                </div>
+            )}
+
+            <div className="space-y-3">
+                <div className="flex justify-between text-gray-300">
+                    <span>Boletos:</span>
+                    <span className="font-semibold">{seats.length}</span>
+                </div>
+
+                <div className="text-sm text-gray-400 border-b border-dashed border-gray-600 pb-2">
+                    {seats.map(s => s.id).join(', ') || 'No hay asientos seleccionados.'}
+                </div>
+
+                <div className="flex justify-between text-lg font-bold pt-2 text-white">
+                    <span>TOTAL A PAGAR:</span>
+                    <span className="text-2xl text-green-400">{formatCurrency(total)}</span>
+                </div>
+            </div>
+
+            <button
+                onClick={onPurchase}
+                disabled={seats.length === 0}
+                className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
+            >
+                Confirmar Compra ({seats.length} Asiento{seats.length !== 1 ? 's' : ''})
+            </button>
+        </div>
+    );
 }

@@ -9,11 +9,48 @@ import Header from "@/components/Header";
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 
-// FUNCION DE SLUG (para usar en el cliente si es necesario)
+// ==========================================================
+// 🛑 MAPEO DE IMÁGENES EXACTAS
+// ==========================================================
+
+const IMAGE_MAP: Record<string, string> = {
+    "the-shawshank-redemption": "/images/the-shawshank-redemption.jpg",
+    "interstellar": "/images/interstellar.jpg",
+    "parasite": "/images/parasite.jpg",
+    "la-la-land": "/images/la-la-land.jpg",
+    "incepcion": "/images/incepcion.jpg",
+    "200-lobo": "/images/lobo_200.jpg",
+};
+
+// ==========================================================
+// CONSTANTES DE PRÓXIMO ESTRENO
+// ==========================================================
+
+const LOBO_SLUG = '200-lobo'; 
+const UPCOMING_SLUG = 'proximamente';
+const UPCOMING_RELEASE_DATE = '2025-12-25'; // Fecha de estreno para simulación (ISO)
+const UPCOMING_DISPLAY_DATE = '25 de Diciembre de 2025'; // Fecha de estreno para mostrar
+
+const UPCOMING_MOVIE_DATA: MovieData = {
+    title: '200% Lobo',
+    image: IMAGE_MAP[LOBO_SLUG] || '/images/lobo_200.jpg',
+    rating: 'G',
+    score: 5.0,
+    genre: 'Animación, Aventura',
+    duration: '90 min',
+    description: 'Freddy, heredero de una noble y heroica familia de hombres lobo, se convierte en un caniche en su 13º cumpleaños, ¡convirtiéndose en la vergüenza de la familia! Con un límite de tiempo, debe demostrar que tiene el corazón de un lobo, o será desterrado para siempre.',
+    slug: LOBO_SLUG,
+    isUpcoming: true,
+};
+
+// ==========================================================
+// FUNCIONES Y TIPOS
+// ==========================================================
+
+// FUNCION DE SLUG
 const createSlug = (title: string): string => {
     return title
-        .toLowerCase()
-        .trim()
+        .toLowerCase().trim()
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
@@ -55,29 +92,35 @@ interface RawMovieResponse {
 
 // FUNCION PARA OBTENER LA URL DE LA IMAGEN
 const getImageURL = (movie: MovieData): string => {
-    let imagePath = '';
-    
-    // 1. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
-    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
-        imagePath = movie.image;
-    }
-    
-    // 2. Si no hay posterUrl válido, usar el slug
-    if (!imagePath || imagePath.includes('movie-default.svg')) {
-        const slug = movie.slug || createSlug(movie.title);
-        // Asume que el archivo local es [slug].jpg. CAMBIA .jpg si usas .png o .webp
-        imagePath = `${slug}.jpg`; 
-    }
+    const slug = movie.slug || createSlug(movie.title || '');
 
-    // 3. Procesar y devolver la ruta final relativa a /public/images/
-    if (imagePath && !imagePath.startsWith('http')) {
-        const filename = imagePath.split('/').pop() || imagePath;
-        return `/images/${filename.toLowerCase()}`; 
+    // 1. 🛑 PRIORIDAD AL MAPEO MANUAL por slug (Garantiza el éxito local)
+    if (IMAGE_MAP[slug]) {
+        return IMAGE_MAP[slug];
+    }
+    
+    // 2. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
+    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
+        // Si el path de la API es un URL completo, lo devolvemos
+        if (movie.image.startsWith('http')) return movie.image;
+
+        // Si es solo el nombre del archivo, construimos la ruta estática
+        const filename = movie.image.split('/').pop() || movie.image;
+        return `/images/${filename.toLowerCase()}`;
+    }
+    
+    // 3. Fallback al slug automático
+    if (slug) {
+        return `/images/${slug.toLowerCase()}.jpg`; 
     }
 
     // 4. Fallback final
     return '/images/movie-default.svg';
 };
+
+// ==========================================================
+// COMPONENTE PRINCIPAL
+// ==========================================================
 
 export default function MovieDetailPage() {
     const params = useParams();
@@ -89,35 +132,27 @@ export default function MovieDetailPage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     
-    // Usamos useCallback para que la función no cambie en cada render
-    const updatePosterSrc = useCallback((newSrc: string) => {
-        setPosterSrc(getImageURL({ ...movie!, image: newSrc }));
-    }, [movie]);
-
     useEffect(() => {
         if (!slug) return;
 
         const fetchData = async () => {
             setLoading(true);
 
-            // 🚨 1. LÓGICA DE EXCEPCIÓN: 200% Lobo
-            if (slug === UPCOMING_SLUG) {
+            // 🛑 LÓGICA CORREGIDA: Incluye el slug real de la película
+            if (slug === UPCOMING_SLUG || slug === LOBO_SLUG) { 
                 setMovie(UPCOMING_MOVIE_DATA);
-                
-                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
-                // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
                 setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
                 
-                // Simulación de horarios con la fecha de estreno
                 const simulatedShowtimes: ShowTime[] = [
                     { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
                     { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
+                    // 🛑 CORRECCIÓN DE TIPEO EN LA CONSTANTE ABAJO
                     { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
                 ];
                 
                 setShowtimes(simulatedShowtimes);
                 setLoading(false);
-                return; // Finaliza la ejecución para el próximo estreno
+                return;
             }
 
             // 2. Obtener datos de la película (Lógica normal de API)
@@ -129,25 +164,27 @@ export default function MovieDetailPage() {
                     setLoading(false);
                     return;
                 }
-                const movieJson = await resMovie.json();
+                const movieJson: RawMovieResponse = await resMovie.json();
                 
                 const movieData: MovieData = {
                     title: movieJson.title || movieJson.name || 'Sin título',
                     image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
                     score: (typeof movieJson.rating === 'number' && movieJson.rating) 
-                           || (typeof movieJson.score === 'number' && movieJson.score) 
-                           || undefined, 
+                                 || (typeof movieJson.score === 'number' && movieJson.score) 
+                                 || undefined, 
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',
                     slug: movieJson.slug || slug,
                 };
                 
+                // Usar getImageURL con los datos obtenidos
+                const finalPosterSrc = getImageURL(movieData);
+                
                 setMovie(movieData);
+                setPosterSrc(finalPosterSrc);
 
-                // establecer la fuente del póster (usando la nueva lógica de generación)
-                setPosterSrc(getImageURL(movieData));
 
                 // FETCH SHOWTIMES (lógica existente)
                 const resShow = await fetch(`${API_BASE}/api/showtimes`);
@@ -209,7 +246,9 @@ export default function MovieDetailPage() {
                             sala: ensureFive[0]?.sala ?? 'Sala',
                             price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
                             availableSeats: ensureFive[0]?.availableSeats ?? 80,
+                            //id generado
                             id: `${slug}-gen-${addIndex}`,
+                            //id: undefined,// o no lo pongas
                             startISO: d.toISOString(),
                         });
                     }
@@ -218,6 +257,7 @@ export default function MovieDetailPage() {
                 setShowtimes(ensureFive);
             } catch (err) {
                 console.error('Error fetch movie/showtimes', err);
+                setNotFound(true);
             } finally {
                 setLoading(false);
             }
@@ -235,9 +275,8 @@ export default function MovieDetailPage() {
         );
     }
 
-    // Obtener la bandera isUpcoming del objeto movie (si fue cargado por la excepción)
     const isUpcoming = movie?.isUpcoming || false;
-    const upcomingReleaseText = `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+    const upcomingReleaseText = isUpcoming && slug === LOBO_SLUG ? `¡Próximo estreno en cines!` : `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
 
     if (notFound || !movie) {
         return (
@@ -254,7 +293,7 @@ export default function MovieDetailPage() {
             <Header />
             <div className="p-4 sm:p-8 md:p-12 lg:p-16">
                 <div className="flex flex-col md:flex-row gap-8 mb-12">
-                    {/* Contenedor de la Imagen: Ahora usa posterSrc generado por getImageURL */}
+                    {/* Contenedor de la Imagen */}
                     <div className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 overflow-hidden max-h-[600px]">
                         <Image
                             src={posterSrc}
@@ -313,26 +352,33 @@ export default function MovieDetailPage() {
 // COMPONENTE SECUNDARIO
 // ==========================================================
 
-// ACTUALIZADO: Acepta la bandera isUpcoming
 function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; movieSlug: string; isUpcoming?: boolean }) {
     const router = useRouter();
 
-    // Lógica para cambiar el botón
     const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
-        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        //comprar solo si no es simulado
+      /*if (!show.id) {
+            alert("Este horario es simulado y no se puede comprar.");
+            return;
+      }
+
+        const params = new URLSearchParams({ showtimeId: show.id });
         router.push(`/comprar?${params.toString()}`);
-    };
+    */
+  const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+        router.push(`/comprar?${params.toString()}`);
+};
+
+
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
-            {/* Si es estreno, muestra la fecha completa, si no, solo la hora */}
             <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
             <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
-                {/* Botón modificado para usar el texto condicional */}
                 <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
                     {buttonText}
                 </button>
