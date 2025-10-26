@@ -162,8 +162,9 @@ export default function ComprarPage() {
         setExpirationTime(tenMinutesLater);
       }
 
-      const successfullyLockedSeats = seatsToLock.filter(s => data.userLockedSeats?.includes(s.id));
-      setSelected(successfullyLockedSeats);
+  // Don't overwrite local selection immediately with server response.
+  // Keep client-managed `selected` so users can freely select/deselect while locks
+  // are being synchronized. We still update `reserved` and `expirationTime`.
 
     } catch (error) { 
       console.error('Error updating seat locks:', error);
