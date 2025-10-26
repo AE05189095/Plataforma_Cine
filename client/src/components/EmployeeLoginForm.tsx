@@ -19,21 +19,29 @@ export default function EmployeeLoginForm({ userType }: Props) {
     setLoading(true);
     setError("");
     try {
-  const endpoint = userType === "admin" ? `${API_BASE}/api/auth/login-admin` : `${API_BASE}/api/auth/login-colaborador`;
+      const endpoint =
+        userType === "admin"
+          ? `${API_BASE}/api/auth/login-admin`
+          : `${API_BASE}/api/auth/login-colaborador`;
+
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Credenciales inválidas");
         setLoading(false);
         return;
       }
-  localStorage.setItem(TOKEN_KEY, data.token);
-      // Redirect to welcome page
-      router.push("/welcome");
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+
+      // Redirect: administradores van al panel admin, colaboradores al welcome
+      if (userType === "admin") router.push("/admin/dashboard");
+      else router.push("/welcome");
     } catch {
       setError("Error de conexión. Verifica que el backend esté ejecutándose.");
     } finally {
@@ -52,18 +60,48 @@ export default function EmployeeLoginForm({ userType }: Props) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-300">Email</label>
-              <input value={email} onChange={e => setEmail(e.target.value)} type="email" required className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white" />
+              <input
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                type="email"
+                required
+                className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white"
+              />
             </div>
             <div>
               <label className="block text-sm text-gray-300">Contraseña</label>
-              <input value={password} onChange={e => setPassword(e.target.value)} type="password" required className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white" />
+              <input
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                type="password"
+                required
+                className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white"
+              />
             </div>
             <div className="flex items-center justify-between mt-2">
               <div className="flex gap-2">
-                <button type="button" onClick={() => router.back()} className="px-4 py-2 bg-gray-700 rounded-lg text-white">Volver</button>
-                <button type="submit" disabled={loading} className="px-6 py-2 bg-red-600 rounded-xl text-white font-medium">{loading ? 'Validando...' : 'Iniciar sesión'}</button>
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="px-4 py-2 bg-gray-700 rounded-lg text-white"
+                >
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 bg-red-600 rounded-xl text-white font-medium"
+                >
+                  {loading ? 'Validando...' : 'Iniciar sesión'}
+                </button>
               </div>
-              <button type="button" onClick={() => router.push('/recover-password')} className="text-sm text-red-400 underline">Recuperar contraseña</button>
+              <button
+                type="button"
+                onClick={() => router.push('/recover-password')}
+                className="text-sm text-red-400 underline"
+              >
+                Recuperar contraseña
+              </button>
             </div>
           </form>
         </div>

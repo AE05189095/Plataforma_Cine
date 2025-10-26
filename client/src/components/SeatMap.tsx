@@ -7,6 +7,8 @@ type Props = {
   cols?: number;
   occupiedSeats: string[];
   reservedSeats: string[];
+  // selectedSeats kept for backward compatibility with callers that pass just ids;
+  // primary selection tracking uses `currentSelectedObjects`.
   selectedSeats: string[];
   currentSelectedObjects: Seat[];
   onSelectionChange?: (seat: Seat) => void; // se envía solo el asiento clickeado
@@ -50,9 +52,15 @@ export default function SeatMap({
   };
 
   const toggleSeat = (seat: Seat) => {
-    if (seat.status === "occupied" || seat.status === "reserved") return;
+    const isSelected = currentSelectedObjects.some(s => s.id === seat.id) || selectedSeats.includes(seat.id);
 
-    const isSelected = currentSelectedObjects.some(s => s.id === seat.id);
+    // If seat is occupied, never allow interaction.
+    if (seat.status === "occupied") return;
+
+    // If seat is reserved by someone else, disallow. But if it's reserved and the
+    // current user already has it selected (i.e. it's in currentSelectedObjects),
+    // allow toggling so the user can deselect their own locked seats.
+    if (seat.status === "reserved" && !isSelected) return;
     if (!isSelected && currentSelectedObjects.length >= MAX_SEATS) {
       if (onMaxSelectionAttempt) onMaxSelectionAttempt();
       return;
@@ -80,12 +88,12 @@ export default function SeatMap({
               <div className="text-gray-400 font-bold text-lg text-center">{row}</div>
               {Array.from({length: cols}, (_, i) => {
                 const seat = makeSeat(row, i+1);
-                const isSelected = currentSelectedObjects.some(s => s.id === seat.id);
+                const isSelected = currentSelectedObjects.some(s => s.id === seat.id) || selectedSeats.includes(seat.id);
                 return (
                   <button
                     key={seat.id}
                     onClick={() => toggleSeat(seat)}
-                    disabled={seat.status === "occupied" || seat.status === "reserved"}
+            disabled={seat.status === "occupied" || (seat.status === "reserved" && !isSelected)}
                     className={getSeatClass(seat.status, isSelected)}
                     title={`Asiento ${seat.id} - ${isSelected ? 'Seleccionado' : seat.status}`}
                     aria-pressed={isSelected}

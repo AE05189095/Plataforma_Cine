@@ -1,8 +1,6 @@
-// src/app/movies/[slug]/page.tsx
-
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { API_BASE } from '@/lib/config';
 import { getPriceForHall } from '@/lib/pricing';
 import Header from "@/components/Header";
@@ -28,7 +26,6 @@ const IMAGE_MAP: Record<string, string> = {
 
 const LOBO_SLUG = '200-lobo'; 
 const UPCOMING_SLUG = 'proximamente';
-const UPCOMING_RELEASE_DATE = '2025-12-25'; // Fecha de estreno para simulación (ISO)
 const UPCOMING_DISPLAY_DATE = '25 de Diciembre de 2025'; // Fecha de estreno para mostrar
 
 const UPCOMING_MOVIE_DATA: MovieData = {
@@ -138,21 +135,14 @@ export default function MovieDetailPage() {
         const fetchData = async () => {
             setLoading(true);
 
-            // 🛑 LÓGICA CORREGIDA: Incluye el slug real de la película
-            if (slug === UPCOMING_SLUG || slug === LOBO_SLUG) { 
+            // Si es un próximo estreno (simulación local), mostramos la info de la película
+            // pero NO generamos horarios simulados automáticamente. Todas las funciones deben
+            // provenir del backend (admin). De este modo evitamos mostrar horarios inventados.
+            if (slug === UPCOMING_SLUG || slug === LOBO_SLUG) {
                 setMovie(UPCOMING_MOVIE_DATA);
-                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
-                
-                const simulatedShowtimes: ShowTime[] = [
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
-                    // 🛑 CORRECCIÓN DE TIPEO EN LA CONSTANTE ABAJO
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
-                ];
-                
-                setShowtimes(simulatedShowtimes);
-                setLoading(false);
-                return;
+                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg');
+                // No hacemos 'return' aquí: dejamos que la lógica de fetch de showtimes
+                // se ejecute y muestre únicamente lo que el backend devuelva.
             }
 
             // 2. Obtener datos de la película (Lógica normal de API)
@@ -213,14 +203,17 @@ export default function MovieDetailPage() {
                     const start = s.startAt ? new Date(s.startAt) : null;
                     const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
                     let hallName = 'Sala';
-                    const capacity = 80;
-                    if (s.hall && typeof s.hall === 'object') {
-                        hallName = (s.hall as { name?: string }).name ?? 'Sala';
+                    // Determinar capacidad a partir de la sala si está poblada, sino fallback a 80
+                    const hallObj = s.hall && typeof s.hall === 'object' ? (s.hall as { name?: string; capacity?: number }) : null;
+                    const capacity = hallObj?.capacity ?? 80;
+                    if (hallObj) {
+                        hallName = hallObj.name ?? 'Sala';
                     } else if (typeof s.hall === 'string') {
                         hallName = s.hall;
                     }
                     const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-                    const available = Math.max(0, capacity - seatsBooked);
+                    // Preferir el valor que envía el backend si está disponible
+                    const available = typeof s.availableSeats === 'number' ? s.availableSeats : Math.max(0, capacity - seatsBooked);
                     const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
                     return {
                         time: timeStr,
@@ -232,27 +225,10 @@ export default function MovieDetailPage() {
                     };
                 });
 
-                // Si hay menos de 5 horarios, generar horarios adicionales
-                const ensureFive: ShowTime[] = [...mapped];
-                if (ensureFive.length < 5) {
-                    const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
-                    let addIndex = 0;
-                    while (ensureFive.length < 5) {
-                        addIndex += 1;
-                        const d = new Date(baseDate.getTime() + addIndex * 2 * 60 * 60 * 1000); // +2h cada vez
-                        const t = d.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
-                        ensureFive.push({
-                            time: t,
-                            sala: ensureFive[0]?.sala ?? 'Sala',
-                            price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
-                            availableSeats: ensureFive[0]?.availableSeats ?? 80,
-                            id: `${slug}-gen-${addIndex}`,
-                            startISO: d.toISOString(),
-                        });
-                    }
-                }
-
-                setShowtimes(ensureFive);
+                // Usar sólo los horarios reales que vienen del backend.
+                // Antes generábamos horarios "simulados" a partir del primero, lo que causaba
+                // que varias tarjetas mostraran la misma sala y disponibilidad. Eso puede confundir al usuario.
+                setShowtimes(mapped);
             } catch (err) {
                 console.error('Error fetch movie/showtimes', err);
                 setNotFound(true);
@@ -274,7 +250,11 @@ export default function MovieDetailPage() {
     }
 
     const isUpcoming = movie?.isUpcoming || false;
-    const upcomingReleaseText = isUpcoming && slug === LOBO_SLUG ? `¡Próximo estreno en cines!` : `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+    // Lógica combinada para el texto de próximo estreno
+    const upcomingReleaseText = isUpcoming && (slug === LOBO_SLUG || slug === UPCOMING_SLUG) 
+        ? `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}` 
+        : `¡Próximo estreno en cines!`;
+
 
     if (notFound || !movie) {
         return (
@@ -356,14 +336,39 @@ function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; mo
     const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
-        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
-        router.push(`/comprar?${params.toString()}`);
+        //comprar solo si no es simulado
+        /*if (!show.id) {
+                alert("Este horario es simulado y no se puede comprar.");
+                return;
+          }
+
+            const params = new URLSearchParams({ showtimeId: show.id });
+            router.push(`/comprar?${params.toString()}`);
+        */
+      const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+            router.push(`/comprar?${params.toString()}`);
     };
+
+
+
+    // Mostrar hora usando startISO si está disponible para evitar inconsistencias de formato
+    let displayTime = show.time;
+    if (show.startISO) {
+        try {
+            displayTime = new Date(show.startISO).toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
+        } catch {
+            // fallback a show.time
+        }
+    }
+
+    // Limpiar nombre de sala si contiene sufijos no deseados (ej: "Sala 1 - slug-de-pelicula")
+    const salaRaw = show.sala || 'Sala';
+    const salaDisplay = typeof salaRaw === 'string' ? salaRaw.replace(/\s*-\s*[^-]+$/,'').trim() : String(salaRaw);
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
-            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
-            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
+            <p className="font-extrabold text-3xl mb-1 text-red-400">{displayTime}</p>
+            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{salaDisplay}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
                 <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
