@@ -13,6 +13,8 @@ const authRoutes = require('./src/routes/auth.routes.js');
 const movieRoutes = require('./src/routes/movie.routes');
 const showtimeRoutes = require('./src/routes/showtime.routes');
 const purchaseRoutes = require('./src/routes/purchase.routes');
+const hallRoutes = require('./src/routes/hall.routes');
+const paymentRoutes = require('./src/routes/payment.routes');
 
 const http = require('http');
 const { Server } = require('socket.io');
@@ -34,7 +36,7 @@ if (ALLOWED_ORIGIN === '*' && process.env.NODE_ENV === 'production') {
 
 app.use(
   cors({
-    origin: ALLOWED_ORIGIN,
+    origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -56,6 +58,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
+app.use('/api/halls', hallRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/', (req, res) => {
   res.send('Servidor de Plataforma Cine en línea.');
@@ -76,17 +80,15 @@ const cleanExpiredLocks = async () => {
         st.seatsLocks = st.seatsLocks.filter(lock => lock.expiresAt >= now);
         await st.save();
 
-        // Emitir evento para que la UI se actualice automáticamente
         if (app.locals.io) {
-          app.locals.io.emit('showtimeUpdated', {
-            _id: st._id,
-            seatsBooked: st.seatsBooked || [],
-            seatsLocked: st.seatsLocks.flatMap(l => l.seats),
-            availableSeats: Math.max(
-              0,
-              (st.hall?.capacity || 0) - ((st.seatsBooked || []).length + st.seatsLocks.flatMap(l => l.seats).length)
-            ),
-          });
+          const seatsLocked = st.seatsLocks.flatMap(l => l.seats);
+          const seatsBooked = st.seatsBooked || [];
+          const availableSeats = Math.max(0, (st.hall?.capacity || 0) - (seatsBooked.length + seatsLocked.length));
+
+          // Emitir eventos específicos por showtime
+          app.locals.io.emit(`updateLockedSeats-${st._id}`, { seatsLocked });
+          app.locals.io.emit(`updateReservedSeats-${st._id}`, { seatsBooked });
+          app.locals.io.emit(`updateAvailableSeats-${st._id}`, { availableSeats });
         }
       }
     }

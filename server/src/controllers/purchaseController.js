@@ -2,8 +2,10 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const Movie = require('../models/Movie');
+const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // ==========================================================
 // LOCK DE ASIENTOS
@@ -16,6 +18,13 @@ exports.lockSeats = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'No autenticado' });
     if (!showtimeId) return res.status(400).json({ message: 'Showtime ID es requerido' });
 
+    let showtimeExists = true;
+    if (showtimeId.includes('-gen-')) showtimeExists = false;
+    else {
+      const showtimeCheck = await Showtime.findById(showtimeId);
+      if (!showtimeCheck) return res.status(404).json({ message: 'Showtime no encontrado' });
+    }
+
     const normalizedSeatIds = Array.isArray(seatIds)
       ? seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)
       : [];
@@ -24,7 +33,6 @@ exports.lockSeats = async (req, res) => {
     const userLockedSeats = normalizedSeatIds;
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
-    // Emitir evento a todos los clientes
     try {
       const io = req.app.get('io');
       if (io) io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
@@ -51,8 +59,8 @@ exports.create = async (req, res) => {
   try {
     session.startTransaction();
 
-    const userId = req.user?._id;
-    const { showtimeId, paymentInfo } = req.body;
+  const userId = req.user?._id;
+  const { showtimeId, paymentInfo, paymentIntentId } = req.body;
     let { seats } = req.body;
 
     if (!userId || !showtimeId || !Array.isArray(seats) || seats.length === 0) {
@@ -109,14 +117,53 @@ exports.create = async (req, res) => {
     }
 
     // ==========================================================
-    // Cálculo total según fila de asiento
+    // Cálculo total: preferir el precio de la función si fue definido por el admin
+    // Si showtime.price está disponible y es numérico > 0, usarlo por asiento.
+    // En otro caso, mantener la lógica por fila (compatibilidad).
     // ==========================================================
     let totalQ = 0;
-    const priceMap = { A: 65, B: 65, C: 55, D: 45, E: 45, F: 45, G: 45, H: 45 };
-    seats.forEach(seatId => {
-      const row = seatId[0].toUpperCase();
-      totalQ += priceMap[row] || 45;
-    });
+    const priceMap = { A: 65, B: 65, C: 55, D: 55, E: 45, F: 45, G: 45, H: 45 };
+    const perSeatPriceFromShowtime = (showtime && typeof showtime.price === 'number' && showtime.price > 0) ? showtime.price : null;
+    if (perSeatPriceFromShowtime !== null) {
+      totalQ = seats.length * perSeatPriceFromShowtime;
+    } else {
+      seats.forEach(seatId => {
+        const row = seatId[0].toUpperCase();
+        totalQ += priceMap[row] || 45;
+      });
+    }
+
+    // Si el cliente pasó un paymentIntentId, validarlo con Stripe (modo test OK)
+    if (paymentIntentId && stripe) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const expectedCents = Math.round(totalQ * 100);
+        if (pi.status !== 'succeeded') {
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'Pago no confirmado' });
+        }
+        if (pi.amount !== expectedCents) {
+          console.warn('PaymentIntent amount mismatch:', pi.amount, expectedCents);
+          // continuar o rechazar; por seguridad rechazamos
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'El monto pagado no coincide con el esperado' });
+        }
+
+        // Extraer detalles no sensibles
+        const charge = pi.charges && pi.charges.data && pi.charges.data[0];
+        const cardLast4 = charge?.payment_method_details?.card?.last4;
+        // Sobrescribir safePayment con info derivada del PaymentIntent
+        paymentInfo = {
+          method: 'card',
+          paymentIntentId,
+          card: { last4: cardLast4 }
+        };
+      } catch (err) {
+        console.error('Error verificando PaymentIntent:', err);
+        await session.abortTransaction();
+        return res.status(500).json({ message: 'Error verificando pago' });
+      }
+    }
 
     // Sanitizar paymentInfo
     let safePayment = {};

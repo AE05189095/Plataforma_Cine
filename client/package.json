@@ -7,6 +7,7 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "sync-image-domains": "node ../scripts/sync-image-domains.js",
     "check:warnings": "node ./scripts/check-build-warnings.js"
   },
   "dependencies": {
