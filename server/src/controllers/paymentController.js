@@ -74,3 +74,42 @@ exports.createCheckoutSession = async (req, res) => {
     res.status(500).json({ message: 'Error creating checkout session' });
   }
 };
+
+exports.retrieveCheckoutSession = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: 'Session ID is required' });
+    }
+    const session = await stripe.checkout.sessions.retrieve(id);
+    res.json(session);
+  } catch (err) {
+    console.error('Error retrieving checkout session:', err);
+    res.status(500).json({ message: 'Error retrieving checkout session' });
+  }
+};
+
+// Procesar pago usando un PaymentMethod ID (método moderno y seguro)
+exports.chargeWithToken = async (req, res) => {
+  try {
+    const { amount, currency = 'GTQ', paymentMethodId, metadata = {} } = req.body;
+
+    if (!amount || !paymentMethodId) {
+      return res.status(400).json({ message: 'Faltan el monto y el ID del método de pago.' });
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Stripe usa centavos
+      currency: currency || 'gtq',
+      payment_method: paymentMethodId,
+      confirm: true, // Confirma el pago inmediatamente
+      metadata: metadata || {},
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    });
+
+    res.json({ success: true, paymentIntentId: paymentIntent.id });
+  } catch (error) {
+    const message = error.raw?.message || error.message || 'Error interno del servidor.';
+    res.status(error.statusCode || 500).json({ message });
+  }
+};
