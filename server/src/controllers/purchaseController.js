@@ -4,6 +4,8 @@ const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
 const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // ==========================================================
 // LOCK DE ASIENTOS
@@ -57,8 +59,8 @@ exports.create = async (req, res) => {
   try {
     session.startTransaction();
 
-    const userId = req.user?._id;
-    const { showtimeId, paymentInfo } = req.body;
+  const userId = req.user?._id;
+  const { showtimeId, paymentInfo, paymentIntentId } = req.body;
     let { seats } = req.body;
 
     if (!userId || !showtimeId || !Array.isArray(seats) || seats.length === 0) {
@@ -129,6 +131,38 @@ exports.create = async (req, res) => {
         const row = seatId[0].toUpperCase();
         totalQ += priceMap[row] || 45;
       });
+    }
+
+    // Si el cliente pasó un paymentIntentId, validarlo con Stripe (modo test OK)
+    if (paymentIntentId && stripe) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const expectedCents = Math.round(totalQ * 100);
+        if (pi.status !== 'succeeded') {
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'Pago no confirmado' });
+        }
+        if (pi.amount !== expectedCents) {
+          console.warn('PaymentIntent amount mismatch:', pi.amount, expectedCents);
+          // continuar o rechazar; por seguridad rechazamos
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'El monto pagado no coincide con el esperado' });
+        }
+
+        // Extraer detalles no sensibles
+        const charge = pi.charges && pi.charges.data && pi.charges.data[0];
+        const cardLast4 = charge?.payment_method_details?.card?.last4;
+        // Sobrescribir safePayment con info derivada del PaymentIntent
+        paymentInfo = {
+          method: 'card',
+          paymentIntentId,
+          card: { last4: cardLast4 }
+        };
+      } catch (err) {
+        console.error('Error verificando PaymentIntent:', err);
+        await session.abortTransaction();
+        return res.status(500).json({ message: 'Error verificando pago' });
+      }
     }
 
     // Sanitizar paymentInfo

@@ -14,6 +14,7 @@ const movieRoutes = require('./src/routes/movie.routes');
 const showtimeRoutes = require('./src/routes/showtime.routes');
 const purchaseRoutes = require('./src/routes/purchase.routes');
 const hallRoutes = require('./src/routes/hall.routes');
+const paymentRoutes = require('./src/routes/payment.routes');
 
 const http = require('http');
 const { Server } = require('socket.io');
@@ -58,6 +59,7 @@ app.use('/api/movies', movieRoutes);
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/halls', hallRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/', (req, res) => {
   res.send('Servidor de Plataforma Cine en línea.');
