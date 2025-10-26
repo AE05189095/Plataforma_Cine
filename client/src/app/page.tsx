@@ -79,7 +79,7 @@ export default function HomePage() {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
         const getImage = (m: RawMovie): string => {
-            if (m.posterUrl && typeof m.posterUrl === 'string' && m.posterUrl.trim() !== '') return m.posterUrl as string;
+            if (m.posterUrl && typeof m.posterUrl === 'string' && m.posterUrl.trim() !== '') return m.posterUrl;
             if (m.title) {
                 const key = m.title.toLowerCase().trim();
                 if (IMAGE_MAP[key]) return IMAGE_MAP[key];
@@ -99,8 +99,13 @@ export default function HomePage() {
                     return {
                         title: m.title || "Sin título",
                         image: getImage(m),
-                        rating: typeof m.rating === 'number' ? String(m.rating) : (m.rating as any) || "PG-13",
-                        score: (typeof m.rating === 'number' && m.rating > 0) ? String(m.rating) : (m.ratingCount ? String(m.ratingCount) : 'N/A'),
+                        rating: m.rating !== undefined && m.rating !== null ? String(m.rating) : "PG-13",
+                        score:
+                            m.rating !== undefined && m.rating !== null && typeof m.rating === 'number' && m.rating > 0
+                                ? String(m.rating)
+                                : m.ratingCount !== undefined && m.ratingCount !== null
+                                    ? String(m.ratingCount)
+                                    : 'N/A',
                         genre: movieGenres[0] || "General",
                         genres: movieGenres,
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
