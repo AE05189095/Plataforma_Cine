@@ -115,14 +115,21 @@ exports.create = async (req, res) => {
     }
 
     // ==========================================================
-    // Cálculo total según fila de asiento
+    // Cálculo total: preferir el precio de la función si fue definido por el admin
+    // Si showtime.price está disponible y es numérico > 0, usarlo por asiento.
+    // En otro caso, mantener la lógica por fila (compatibilidad).
     // ==========================================================
     let totalQ = 0;
     const priceMap = { A: 65, B: 65, C: 55, D: 55, E: 45, F: 45, G: 45, H: 45 };
-    seats.forEach(seatId => {
-      const row = seatId[0].toUpperCase();
-      totalQ += priceMap[row] || 45;
-    });
+    const perSeatPriceFromShowtime = (showtime && typeof showtime.price === 'number' && showtime.price > 0) ? showtime.price : null;
+    if (perSeatPriceFromShowtime !== null) {
+      totalQ = seats.length * perSeatPriceFromShowtime;
+    } else {
+      seats.forEach(seatId => {
+        const row = seatId[0].toUpperCase();
+        totalQ += priceMap[row] || 45;
+      });
+    }
 
     // Sanitizar paymentInfo
     let safePayment = {};

@@ -38,9 +38,9 @@ export default function AdminPeliculasPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (mounted) setMovies(data || []);
-      } catch (err: any) {
-        console.error('Error cargando películas:', err);
-        setError('No se pudo cargar las películas');
+        } catch (err: unknown) {
+          console.error('Error cargando películas:', err);
+          setError((err as Error)?.message || 'No se pudo cargar las películas');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -52,7 +52,7 @@ export default function AdminPeliculasPage() {
   const openEditor = (m: Movie) => setEditing(m);
   const closeEditor = () => setEditing(null);
 
-  const handleChange = (field: keyof Movie, value: any) => {
+  const handleChange = (field: keyof Movie, value: string | number | boolean | string[] | undefined) => {
     if (!editing) return;
     setEditing({ ...editing, [field]: value });
   };
@@ -63,28 +63,28 @@ export default function AdminPeliculasPage() {
   };
   const closeCreate = () => setCreating(false);
 
-  const handleNewChange = (field: keyof Movie | string, value: any) => {
+  const handleNewChange = (field: keyof Movie | string, value: string | number | boolean | string[] | undefined) => {
     setNewMovie({ ...newMovie, [field]: value });
   };
 
   const createMovie = async () => {
     setSaving(true);
     try {
-      const payload: any = { ...newMovie };
-      if (payload.duration === '') payload.duration = undefined;
+      const payloadObj: Record<string, unknown> = { ...newMovie };
+      if (payloadObj.duration === '') payloadObj.duration = undefined;
       const res = await fetch(`${API_BASE}/api/movies`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloadObj),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const created = await res.json();
       setMovies([created, ...movies]);
       closeCreate();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error creando película:', err);
-      setError('No se pudo crear la película');
+      setError((err as Error)?.message || 'No se pudo crear la película');
     } finally {
       setSaving(false);
     }
@@ -116,9 +116,9 @@ export default function AdminPeliculasPage() {
       const updated = await res.json();
       setMovies(movies.map(m => m._id === updated._id ? updated : m));
       closeEditor();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error guardando película:', err);
-      setError('No se pudo guardar la película');
+      setError((err as Error)?.message || 'No se pudo guardar la película');
     } finally {
       setSaving(false);
     }
@@ -205,7 +205,7 @@ export default function AdminPeliculasPage() {
 
               <label className="flex flex-col">
                 <span className="text-sm text-gray-300">Ranking (rating) 0-10</span>
-                <input type="number" min={0} max={10} step={0.1} value={(editing.rating as any) ?? 0} onChange={e => handleChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <input type="number" min={0} max={10} step={0.1} value={editing.rating ?? 0} onChange={e => handleChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
               </label>
 
               <label className="flex items-center gap-2">
@@ -270,7 +270,7 @@ export default function AdminPeliculasPage() {
 
               <label className="flex flex-col">
                 <span className="text-sm text-gray-300">Ranking (rating) 0-10</span>
-                <input type="number" min={0} max={10} step={0.1} value={(newMovie.rating as any) ?? 0} onChange={e => handleNewChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <input type="number" min={0} max={10} step={0.1} value={newMovie.rating ?? 0} onChange={e => handleNewChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
               </label>
 
               <label className="flex items-center gap-2">
