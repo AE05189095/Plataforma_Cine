@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const Movie = require('../models/Movie');
+const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 
 // ==========================================================
@@ -16,6 +16,13 @@ exports.lockSeats = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'No autenticado' });
     if (!showtimeId) return res.status(400).json({ message: 'Showtime ID es requerido' });
 
+    let showtimeExists = true;
+    if (showtimeId.includes('-gen-')) showtimeExists = false;
+    else {
+      const showtimeCheck = await Showtime.findById(showtimeId);
+      if (!showtimeCheck) return res.status(404).json({ message: 'Showtime no encontrado' });
+    }
+
     const normalizedSeatIds = Array.isArray(seatIds)
       ? seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)
       : [];
@@ -24,7 +31,6 @@ exports.lockSeats = async (req, res) => {
     const userLockedSeats = normalizedSeatIds;
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
 
-    // Emitir evento a todos los clientes
     try {
       const io = req.app.get('io');
       if (io) io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
@@ -112,7 +118,7 @@ exports.create = async (req, res) => {
     // Cálculo total según fila de asiento
     // ==========================================================
     let totalQ = 0;
-    const priceMap = { A: 65, B: 65, C: 55, D: 45, E: 45, F: 45, G: 45, H: 45 };
+    const priceMap = { A: 65, B: 65, C: 55, D: 55, E: 45, F: 45, G: 45, H: 45 };
     seats.forEach(seatId => {
       const row = seatId[0].toUpperCase();
       totalQ += priceMap[row] || 45;

@@ -1,5 +1,3 @@
-// src/app/movies/[slug]/page.tsx
-
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
@@ -276,7 +274,11 @@ export default function MovieDetailPage() {
     }
 
     const isUpcoming = movie?.isUpcoming || false;
-    const upcomingReleaseText = isUpcoming && slug === LOBO_SLUG ? `¡Próximo estreno en cines!` : `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+    // Lógica combinada para el texto de próximo estreno
+    const upcomingReleaseText = isUpcoming && (slug === LOBO_SLUG || slug === UPCOMING_SLUG) 
+        ? `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}` 
+        : `¡Próximo estreno en cines!`;
+
 
     if (notFound || !movie) {
         return (
@@ -358,18 +360,18 @@ function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; mo
     const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
-        //comprar solo si no es simulado
-      /*if (!show.id) {
-            alert("Este horario es simulado y no se puede comprar.");
-            return;
-      }
+        //comprar solo si no es simulado
+        /*if (!show.id) {
+                alert("Este horario es simulado y no se puede comprar.");
+                return;
+          }
 
-        const params = new URLSearchParams({ showtimeId: show.id });
-        router.push(`/comprar?${params.toString()}`);
-    */
-  const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
-        router.push(`/comprar?${params.toString()}`);
-};
+            const params = new URLSearchParams({ showtimeId: show.id });
+            router.push(`/comprar?${params.toString()}`);
+        */
+      const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+            router.push(`/comprar?${params.toString()}`);
+    };
 
 
 

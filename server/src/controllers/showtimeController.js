@@ -1,6 +1,8 @@
 // server/src/controllers/showtimeController.js
 const mongoose = require('mongoose');
 const Showtime = require('../models/Showtime');
+const Movie = require('../models/Movie');
+const Hall = require('../models/Hall');
 
 const LOCK_DURATION_MINUTES = 10;
 const CLEANUP_INTERVAL_MS = 30 * 1000; // cada 30 segundos limpiar locks expirados
@@ -237,5 +239,139 @@ exports.reserveSeats = async (req, res) => {
   } catch (err) {
     console.error('showtimeController.reserveSeats ERROR:', err);
     res.status(500).json({ message: 'Error interno del servidor al reservar asientos' });
+  }
+};
+
+// ==========================================================
+// CREAR / ACTUALIZAR / ELIMINAR SHOWTIME (ADMIN)
+// ==========================================================
+
+// Helper para formatear date/time
+const toYMD = (d) => d.toISOString().slice(0, 10);
+const toHHmm = (d) => d.toISOString().slice(11, 16);
+
+// Comprueba solapamiento entre dos intervalos
+const overlaps = (aStart, aEnd, bStart, bEnd) => {
+  return aStart < bEnd && bStart < aEnd;
+};
+
+// Duración por defecto si la película no tiene duration (minutos)
+const DEFAULT_DURATION_MIN = 120;
+
+exports.create = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
+
+    const { movie: movieId, hall: hallId, startAt: startAtRaw, price } = req.body;
+    if (!movieId || !hallId || !startAtRaw) return res.status(400).json({ message: 'movie, hall y startAt son requeridos' });
+
+    const movie = await Movie.findById(movieId);
+    const hall = await Hall.findById(hallId);
+    if (!movie) return res.status(404).json({ message: 'Película no encontrada' });
+    if (!hall) return res.status(404).json({ message: 'Sala no encontrada' });
+
+    const startAt = new Date(startAtRaw);
+    if (isNaN(startAt.getTime())) return res.status(400).json({ message: 'startAt inválido' });
+
+    const durationMin = typeof movie.duration === 'number' && movie.duration > 0 ? movie.duration : DEFAULT_DURATION_MIN;
+    const endAt = new Date(startAt.getTime() + durationMin * 60000);
+
+    const existing = await Showtime.find({ hall: hall._id, isActive: true }).populate('movie').lean();
+    for (const st of existing) {
+      const sStart = new Date(st.startAt);
+      const sEnd = st.endAt ? new Date(st.endAt) : new Date(sStart.getTime() + ((st.movie && st.movie.duration) ? st.movie.duration * 60000 : DEFAULT_DURATION_MIN * 60000));
+      if (overlaps(startAt, endAt, sStart, sEnd)) {
+        return res.status(409).json({ message: `Overlap con otra función en la misma sala (${sStart.toISOString()} - ${sEnd.toISOString()})` });
+      }
+    }
+
+    const doc = new Showtime({
+      movie: movie._id,
+      hall: hall._id,
+      startAt,
+      endAt,
+      date: toYMD(startAt),
+      time: toHHmm(startAt),
+      price: typeof price === 'number' ? price : 0,
+      isActive: true,
+    });
+
+    await doc.save();
+    const populated = await Showtime.findById(doc._id).populate('movie').populate('hall').lean();
+    res.status(201).json(populated);
+  } catch (err) {
+    console.error('showtimeController.create ERROR:', err);
+    res.status(500).json({ message: 'Error interno al crear función' });
+  }
+};
+
+exports.update = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
+
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ message: 'ID es requerido' });
+
+    const payload = req.body || {};
+
+    const existing = await Showtime.findById(id);
+    if (!existing) return res.status(404).json({ message: 'Función no encontrada' });
+
+    const movieId = payload.movie || existing.movie;
+    const hallId = payload.hall || existing.hall;
+    const startAt = payload.startAt ? new Date(payload.startAt) : new Date(existing.startAt);
+
+    const movie = await Movie.findById(movieId);
+    const hall = await Hall.findById(hallId);
+    if (!movie) return res.status(404).json({ message: 'Película no encontrada' });
+    if (!hall) return res.status(404).json({ message: 'Sala no encontrada' });
+
+    const durationMin = typeof movie.duration === 'number' && movie.duration > 0 ? movie.duration : DEFAULT_DURATION_MIN;
+    const endAt = new Date(startAt.getTime() + durationMin * 60000);
+
+    const others = await Showtime.find({ hall: hallId, isActive: true, _id: { $ne: existing._id } }).populate('movie').lean();
+    for (const st of others) {
+      const sStart = new Date(st.startAt);
+      const sEnd = st.endAt ? new Date(st.endAt) : new Date(sStart.getTime() + ((st.movie && st.movie.duration) ? st.movie.duration * 60000 : DEFAULT_DURATION_MIN * 60000));
+      if (overlaps(startAt, endAt, sStart, sEnd)) {
+        return res.status(409).json({ message: `Overlap con otra función en la misma sala (${sStart.toISOString()} - ${sEnd.toISOString()})` });
+      }
+    }
+
+    existing.movie = movie._id;
+    existing.hall = hall._id;
+    existing.startAt = startAt;
+    existing.endAt = endAt;
+    existing.date = toYMD(startAt);
+    existing.time = toHHmm(startAt);
+    if (typeof payload.price === 'number') existing.price = payload.price;
+    if (typeof payload.isActive === 'boolean') existing.isActive = payload.isActive;
+
+    await existing.save();
+    const populated = await Showtime.findById(existing._id).populate('movie').populate('hall').lean();
+    res.json(populated);
+  } catch (err) {
+    console.error('showtimeController.update ERROR:', err);
+    res.status(500).json({ message: 'Error interno al actualizar función' });
+  }
+};
+
+exports.remove = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
+
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ message: 'ID es requerido' });
+
+    const existing = await Showtime.findById(id);
+    if (!existing) return res.status(404).json({ message: 'Función no encontrada' });
+
+    existing.isActive = false;
+    await existing.save();
+
+    res.json({ message: 'Función desactivada' });
+  } catch (err) {
+    console.error('showtimeController.remove ERROR:', err);
+    res.status(500).json({ message: 'Error interno al eliminar función' });
   }
 };

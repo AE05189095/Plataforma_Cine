@@ -1,6 +1,6 @@
-import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 
-export const sendConfirmationEmail = async (to, purchaseDetails) => {
+async function sendConfirmationEmail(to, purchaseDetails) {
   const testAccount = await nodemailer.createTestAccount();
 
   const transporter = nodemailer.createTransport({
@@ -40,4 +40,6 @@ export const sendConfirmationEmail = async (to, purchaseDetails) => {
   const info = await transporter.sendMail(mailOptions);
   console.log('📧 Email enviado:', info.messageId);
   console.log('🔗 Vista previa:', nodemailer.getTestMessageUrl(info));
-};
+}
+
+module.exports = { sendConfirmationEmail };

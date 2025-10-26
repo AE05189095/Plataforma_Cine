@@ -57,7 +57,6 @@ const IMAGE_MAP: Record<string, string> = {
     "parasite": "/images/parasite.jpg",
     "la la land": "/images/la-la-land.jpg",
     "incepcion": "/images/incepcion.jpg",
-    "200% lobo": "/images/lobo_200.jpg",
 };
 
 export default function HomePage() {
@@ -67,6 +66,7 @@ export default function HomePage() {
     const [selectedGenre, setSelectedGenre] = useState(ALL_GENRES[0]);
     const [selectedDate, setSelectedDate] = useState("");
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
+    const [apiError, setApiError] = useState(false);
     const [logoClickCount, setLogoClickCount] = useState(0);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -79,12 +79,11 @@ export default function HomePage() {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
         const getImage = (m: RawMovie): string => {
+            if (m.posterUrl && typeof m.posterUrl === 'string' && m.posterUrl.trim() !== '') return m.posterUrl as string;
             if (m.title) {
                 const key = m.title.toLowerCase().trim();
                 if (IMAGE_MAP[key]) return IMAGE_MAP[key];
             }
-
-            // fallback al slug automático
             if (m.title) return `/images/${(m.slug || createSlug(m.title)).toLowerCase()}.jpg`;
             return "/images/movie-default.svg";
         };
@@ -100,8 +99,8 @@ export default function HomePage() {
                     return {
                         title: m.title || "Sin título",
                         image: getImage(m),
-                        rating: m.rating ? String(m.rating) : "PG-13",
-                        score: m.rating ? String(m.rating) : m.ratingCount ? String(m.ratingCount) : "N/A",
+                        rating: typeof m.rating === 'number' ? String(m.rating) : (m.rating as any) || "PG-13",
+                        score: (typeof m.rating === 'number' && m.rating > 0) ? String(m.rating) : (m.ratingCount ? String(m.ratingCount) : 'N/A'),
                         genre: movieGenres[0] || "General",
                         genres: movieGenres,
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
@@ -110,43 +109,22 @@ export default function HomePage() {
                     };
                 });
 
-                // Inyectar la película 200% Lobo
-                const newMovie: MovieData = {
-                    title: "200% Lobo",
-                    image: "/images/lobo_200.jpg",
-                    rating: "G",
-                    score: "5",
-                    genre: "Animación",
-                    genres: ["Animación", "Comedia"],
-                    releaseDate: "2025-11-30",
-                    duration: "95 min",
-                    description: "La esperada secuela del divertido lobo y sus aventuras.",
-                    isUpcoming: true,
-                };
-
-                if (mounted) setAllMovies([...mapped, newMovie]);
+                if (mounted) setAllMovies(mapped);
+                if (mounted) setApiError(false);
             } catch (err) {
                 console.warn("Error al cargar películas:", err);
-
-                // fallback mínimo
-                const fallbackMovie: MovieData = {
-                    title: "200% Lobo (Fallback)",
-                    image: "/images/lobo_200.jpg",
-                    rating: "G",
-                    score: "5",
-                    genre: "Animación",
-                    genres: ["Animación", "Comedia"],
-                    releaseDate: "2025-11-30",
-                    duration: "95 min",
-                    description: "La esperada secuela del divertido lobo y sus aventuras. (Modo Fallback)",
-                    isUpcoming: true,
-                };
-                if (mounted && allMovies.length === 0) setAllMovies([fallbackMovie]);
+                if (mounted) {
+                    setAllMovies([]);
+                    setApiError(true);
+                }
             }
         };
 
         loadMovies();
-        return () => { mounted = false; };
+
+        // Refrescar automáticamente cada 15s
+        const interval = setInterval(() => { if (mounted) loadMovies(); }, 15000);
+        return () => { mounted = false; clearInterval(interval); };
     }, []);
 
     // Admin dev mode
@@ -218,9 +196,13 @@ export default function HomePage() {
                             <MovieCard key={movie.title + index} {...movie} />
                         ))
                     ) : (
-                        <p className="col-span-full text-center text-xl text-gray-400">
-                            No se encontraron películas que coincidan con los filtros aplicados.
-                        </p>
+                        <div className="col-span-full text-center">
+                            {apiError ? (
+                                <p className="text-xl text-red-400">Películas temporalmente indisponibles — no se pudieron cargar desde el servidor.</p>
+                            ) : (
+                                <p className="text-xl text-gray-400">No se encontraron películas que coincidan con los filtros aplicados.</p>
+                            )}
+                        </div>
                     )}
                 </section>
             </main>
