@@ -257,4 +257,56 @@ exports.listByUser = async (req, res) => {
   }
 };
 
+// ==========================================================
+// CANCELAR COMPRA
+// ==========================================================
+exports.cancel = async (req, res) => {
+  try {
+    const purchaseId = req.params.id;
+    const userId = req.user?._id;
+
+    if (!userId) return res.status(401).json({ message: 'No autenticado' });
+    if (!purchaseId) return res.status(400).json({ message: 'ID de compra requerido' });
+
+    const purchase = await Purchase.findOne({ _id: purchaseId, user: userId });
+    if (!purchase) return res.status(404).json({ message: 'Compra no encontrada' });
+
+    // Opcional: validación de 24 horas
+    // const createdAt = new Date(purchase.createdAt);
+    // const now = new Date();
+    // if ((now - createdAt) / 1000 / 60 / 60 > 24) {
+    //   return res.status(403).json({ message: 'Solo se puede cancelar dentro de las 24 horas' });
+    // }
+
+    purchase.status = "cancelled";
+    await purchase.save();
+
+    // Emitir evento para liberar asientos
+    try {
+      const io = req.app.get('io');
+      if (io && purchase.showtime) {
+        const showtime = await Showtime.findById(purchase.showtime).lean();
+        const occupiedSeats = showtime?.seatsBooked || [];
+        const newSeats = occupiedSeats.filter(s => !purchase.seats.includes(s));
+
+        await Showtime.findByIdAndUpdate(purchase.showtime, { seatsBooked: newSeats });
+
+        io.emit('showtimeUpdated', {
+          _id: purchase.showtime,
+          seatsBooked: newSeats,
+          availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - newSeats.length),
+        });
+      }
+    } catch (err) {
+      console.error('Error emitiendo showtimeUpdated al cancelar:', err);
+    }
+
+    res.json({ message: 'Compra cancelada', purchase });
+  } catch (err) {
+    console.error('Error cancelando compra:', err);
+    res.status(500).json({ message: err.message || 'Error interno al cancelar compra' });
+  }
+};
+
+
 

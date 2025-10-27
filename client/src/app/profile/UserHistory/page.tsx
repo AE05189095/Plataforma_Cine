@@ -8,7 +8,12 @@ type ShowtimeType = {
   movie?: { title: string };
   hall?: { name: string };
   startAt?: string;
+  date?: string;
+  time?: string;
+  price?: number;
+  seatsBooked?: string[];
 };
+
 
 type Purchase = {
   _id: string;
@@ -16,10 +21,9 @@ type Purchase = {
   seats: string[];
   totalPrice: number;
   status?: string;
-  createdAt?: string; // demo
+  createdAt?: string;
 };
 
-// Type guard
 function isShowtimeObject(showtime: string | ShowtimeType): showtime is ShowtimeType {
   return typeof showtime === "object" && showtime !== null;
 }
@@ -28,6 +32,8 @@ export default function UserHistoryPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; type: "error" | "success" } | null>(null);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPurchases = async () => {
@@ -60,10 +66,9 @@ export default function UserHistoryPage() {
     fetchPurchases();
   }, []);
 
-  // Formatea fecha y hora
-  const formatDateTime = (isoString?: string) => {
+  const formatDateTime = (isoString?: string | Date) => {
     if (!isoString) return "N/A";
-    const date = new Date(isoString);
+    const date = isoString instanceof Date ? isoString : new Date(isoString);
     return date.toLocaleString("es-ES", {
       day: "2-digit",
       month: "2-digit",
@@ -74,25 +79,51 @@ export default function UserHistoryPage() {
     });
   };
 
-  // Demo: botón cancelar siempre habilitado si no está cancelada
-  const canCancel = (purchase: Purchase) => {
-    return purchase.status !== "cancelled";
-  };
+  const canCancel = (purchase: Purchase) => purchase.status !== "cancelled";
 
-  const handleCancel = (id: string) => {
-    // Demo: solo actualizamos el estado local
-    setPurchases((prev) =>
-      prev.map((p) =>
-        p._id === id ? { ...p, status: "cancelled" } : p
-      )
-    );
-    alert("Compra cancelada (demo)");
+  const handleCancel = async (id: string) => {
+    if (!window.confirm("¿Estás seguro que quieres cancelar esta compra?")) return;
+
+    setCancelingId(id);
+    setMessage(null);
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const res = await fetch(`${API_BASE}/api/purchases/${id}/cancel`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error("Cancel purchase error:", { status: res.status, statusText: res.statusText, body });
+        setMessage({
+          text: `Error cancelando compra: ${res.status} ${res.statusText} ${JSON.stringify(body)}`,
+          type: "error",
+        });
+        setCancelingId(null);
+        return;
+      }
+      setPurchases(prev =>
+        prev.map(p => (p._id === id ? { ...p, status: "cancelled" } : p))
+      );
+      setMessage({ text: "Compra cancelada", type: "success" });
+    } catch (err) {
+      console.error("Cancel purchase error:", err);
+      setMessage({ text: "Error cancelando compra", type: "error" });
+    } finally {
+      setCancelingId(null);
+    }
   };
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-8 max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-amber-300 mb-4">Historial de entradas</h1>
+
+        {message && (
+          <div className={message.type === "error" ? "text-red-400 mb-2" : "text-green-400 mb-2"}>
+            {message.text}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-slate-400">Cargando...</div>
@@ -113,20 +144,27 @@ export default function UserHistoryPage() {
               </tr>
             </thead>
             <tbody>
-              {purchases.map((p) => {
+              {purchases.map(p => {
                 let movieTitle = "N/A";
+                let purchaseDate = "N/A";
                 if (isShowtimeObject(p.showtime)) {
                   movieTitle = p.showtime.movie?.title || "N/A";
+                  // usar startAt si existe
+                  if (p.showtime.startAt) {
+                    purchaseDate = formatDateTime(p.showtime.startAt);
+                  } else if (p.showtime.date && p.showtime.time) {
+                    purchaseDate = formatDateTime(`${p.showtime.date}T${p.showtime.time}`);
+                  }
                 } else if (typeof p.showtime === "string") {
                   const parts = p.showtime.split("-gen-")[0];
                   movieTitle = parts
                     .split("-")
-                    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                     .join(" ");
+                  purchaseDate = formatDateTime(p.createdAt);
                 }
 
-                const hallName = "Sala";
-                const purchaseDate = formatDateTime(p.createdAt);
+                const hallName = isShowtimeObject(p.showtime) ? p.showtime.hall?.name || "Sala" : "Sala";
                 const status = p.status || "reserved";
 
                 return (
@@ -143,9 +181,9 @@ export default function UserHistoryPage() {
                         <button
                           className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
                           onClick={() => handleCancel(p._id)}
-                          disabled={!canCancel(p)}
+                          disabled={!canCancel(p) || cancelingId === p._id}
                         >
-                          Cancelar
+                          {cancelingId === p._id ? "Cancelando..." : "Cancelar"}
                         </button>
                       )}
                     </td>
@@ -159,6 +197,12 @@ export default function UserHistoryPage() {
     </ProtectedRoute>
   );
 }
+
+
+
+
+
+
 
 
 
