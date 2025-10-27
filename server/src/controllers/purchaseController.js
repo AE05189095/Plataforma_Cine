@@ -2,36 +2,44 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
-const SeatLock = require('../models/SeatLock');
-// Lock/Unlock de asientos
+const Movie = require('../models/Movie'); // necesario para showtimes simulados
+const { sendConfirmationEmail } = require('../utils/sendEmail');
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+// ==========================================================
+// LOCK DE ASIENTOS
+// ==========================================================
 exports.lockSeats = async (req, res) => {
   try {
     const { showtimeId } = req.params;
     const { seatIds } = req.body;
-    const userId = req.user._id;
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: 'No autenticado' });
     if (!showtimeId) return res.status(400).json({ message: 'Showtime ID es requerido' });
-    // Para modo demo - si showtimeId es simulado
+
     let showtimeExists = true;
     if (showtimeId.includes('-gen-')) showtimeExists = false;
     else {
       const showtimeCheck = await Showtime.findById(showtimeId);
       if (!showtimeCheck) return res.status(404).json({ message: 'Showtime no encontrado' });
     }
+
     const normalizedSeatIds = Array.isArray(seatIds)
       ? seatIds.map(s => String(s).trim().toUpperCase()).filter(Boolean)
       : [];
+
     const lockedSeats = normalizedSeatIds;
     const userLockedSeats = normalizedSeatIds;
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
-    // Emitir evento sockets
+
     try {
       const io = req.app.get('io');
-      if (io) {
-        io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
-      }
+      if (io) io.emit('seatsLocked', { showtimeId, seats: lockedSeats });
     } catch (e) {
       console.error('Error emitiendo seatsLocked:', e);
     }
+
     res.json({
       lockedSeats,
       userLockedSeats,
@@ -42,127 +50,195 @@ exports.lockSeats = async (req, res) => {
     res.status(500).json({ message: err.message || 'Error interno del servidor al procesar locks' });
   }
 };
-// Crear una compra (reserva)
+
+// ==========================================================
+// CREAR COMPRA (RESERVA)
+// ==========================================================
 exports.create = async (req, res) => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    const userId = req.user._id;
-    const { showtimeId, paymentInfo } = req.body;
-    let { seats } = req.body;
-    if (!userId || !showtimeId || !Array.isArray(seats) || seats.length === 0) {
+
+    const userId = req.user?._id;
+    const { paymentIntentId } = req.body;
+    let { showtimeId, seats } = req.body; // Estos vienen del cliente ahora
+
+    if (!userId || !paymentIntentId) {
       await session.abortTransaction();
-      return res.status(400).json({ message: 'Datos incompletos' });
+      return res.status(400).json({ message: 'Faltan datos del usuario o del pago.' });
     }
-    // Normalizar asientos
+
     seats = seats.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     seats = Array.from(new Set(seats));
-    // ===============================
-    // Manejo de showtime simulado
-    // ===============================
+
     let showtime = null;
-    if (showtimeId.includes('-gen-')) {
+    let movieTitle = null;
+    let totalQ = 0;
+    let paymentInfo = {};
+
+    // Si el cliente pasó un paymentIntentId, validarlo con Stripe (fuente de verdad)
+    if (paymentIntentId && stripe) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (pi.status !== 'succeeded') {
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'Pago no confirmado' });
+        }
+
+        // Extraer metadatos guardados al crear el pago
+        showtimeId = pi.metadata.showtimeId || showtimeId;
+        seats = pi.metadata.seats ? pi.metadata.seats.split(',') : seats;
+        totalQ = pi.amount / 100; // Stripe usa centavos
+
+        const charge = pi.charges?.data[0];
+        const cardLast4 = charge?.payment_method_details?.card?.last4;
+        paymentInfo = { method: 'card', paymentIntentId, card: { last4: cardLast4 } };
+
+      } catch (err) {
+        console.error('Error verificando PaymentIntent:', err);
+        await session.abortTransaction();
+        return res.status(500).json({ message: 'Error verificando pago' });
+      }
+    }
+
+    const isSimulated = !mongoose.Types.ObjectId.isValid(showtimeId) || showtimeId.includes('-gen-');
+
+    if (isSimulated) {
+      const slugMatch = showtimeId.match(/^(.+)-gen-/);
+      const movieSlug = slugMatch ? slugMatch[1] : null;
+      if (movieSlug) {
+        const movieDoc = await Movie.findOne({ slug: movieSlug }).lean();
+        movieTitle = movieDoc?.title || 'Película Desconocida';
+      } else {
+        movieTitle = 'Película Desconocida';
+      }
+      const todayStr = new Date().toISOString().split('T')[0];
       showtime = {
         _id: showtimeId,
         seatsBooked: [],
         price: 45,
-        hall: { name: 'Sala Demo', capacity: 100 },
-        movie: { title: 'Película Demo' },
+        date: todayStr,
+        time: '18:30',
+        hall: { name: 'Sala Virtual', capacity: 100 },
+        movie: { title: movieTitle },
+        startAt: new Date(`${todayStr}T18:30`)
       };
     } else {
-      showtime = await Showtime.findById(showtimeId).session(session);
-      if (!showtime) {
+      // 1. Verificar que los asientos no estén ocupados ANTES de actualizar
+      const showtimeToCheck = await Showtime.findById(showtimeId).session(session);
+      if (!showtimeToCheck) {
         await session.abortTransaction();
         return res.status(404).json({ message: 'Showtime no encontrado' });
       }
-    }
-    // Verificar que los asientos no estén ocupados
-    const occupiedSeats = showtime.seatsBooked || [];
-    const alreadyOccupied = seats.filter(seat => occupiedSeats.includes(seat));
-    if (alreadyOccupied.length > 0) {
-      await session.abortTransaction();
-      return res.status(409).json({
-        message: `Los siguientes asientos ya están ocupados: ${alreadyOccupied.join(', ')}`,
-      });
-    }
-    // Actualizar showtime real si no es simulado
-    if (!showtimeId.includes('-gen-')) {
+      const alreadyOccupied = seats.filter(seat => (showtimeToCheck.seatsBooked || []).includes(seat));
+      if (alreadyOccupied.length > 0) {
+        await session.abortTransaction();
+        return res.status(409).json({
+          message: `Los siguientes asientos ya están ocupados: ${alreadyOccupied.join(', ')}`,
+        });
+      }
+
+      // 2. Actualizar showtime si los asientos están libres
       await Showtime.findByIdAndUpdate(
         showtimeId,
         { $push: { seatsBooked: { $each: seats } } },
-        { new: true, session }
+        { session }
       );
-    }
-    // Calcular total
-    const totalPrice = (showtime.price || 45) * seats.length;
-    // Sanitizar paymentInfo
-    let safePayment = {};
-    try {
-      if (paymentInfo && typeof paymentInfo === 'object') {
-        const m = paymentInfo.method;
-        if (m === 'card' && paymentInfo.card) {
-          const c = paymentInfo.card;
-          safePayment = {
-            method: 'card',
-            card: {
-              last4: c.number ? String(c.number).slice(-4) : undefined,
-              name: c.name || undefined,
-              expMonth: c.expMonth || undefined,
-              expYear: c.expYear || undefined,
-            },
-          };
-        } else if (m === 'paypal' && paymentInfo.paypal) {
-          safePayment = { method: 'paypal', paypal: { email: paymentInfo.paypal.email || '' } };
-        }
+
+      // 3. Obtener el showtime actualizado para el resto de la lógica
+      showtime = await Showtime.findById(showtimeId)
+        .populate('movie')
+        .populate('hall')
+        .select('movie hall startAt date time price seatsBooked')
+        .session(session);
+
+      if (!showtime) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Showtime no encontrado después de actualizar' });
       }
-    } catch (e) {
-      console.warn('Error sanitizando paymentInfo:', e);
-      safePayment = {};
+
+      movieTitle = showtime.movie?.title || 'Película Desconocida';
     }
+
     const confirmationCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
     // Crear compra
     const createdPurchase = await Purchase.create([{
       user: userId,
       showtime: showtimeId,
       seats,
-      totalPrice,
+      totalPrice: totalQ,
       status: 'reserved',
-      paymentInfo: safePayment,
+      paymentInfo: paymentInfo,
       confirmationCode,
       emailSent: false,
     }], { session });
+
     await session.commitTransaction();
+
     // Emitir eventos de socket
     try {
       const io = req.app.get('io');
-      if (io) {
-        const seatsArr = [...occupiedSeats, ...seats];
+      if (io && !isSimulated) { // Solo emitir para showtimes reales
+        const freshShowtime = await Showtime.findById(showtimeId).lean();
+        const occupiedSeats = freshShowtime?.seatsBooked || [];
         io.emit('showtimeUpdated', {
           _id: showtimeId,
-          seatsBooked: seatsArr,
-          availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - seatsArr.length),
+          seatsBooked: [...occupiedSeats],
+          availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - occupiedSeats.length),
         });
-        io.emit('seatsLocked', { showtimeId, seats: [] });
+        io.emit('seatsLocked', { showtimeId, seats: [] }); // Limpiar locks para todos
       }
     } catch (e) {
       console.error('Error emitiendo eventos:', e);
     }
-    res.status(201).json({
-      purchase: createdPurchase[0],
-      showtime: showtime,
+
+    // ==========================================================
+    // Preparar fecha y hora para correo
+    // ==========================================================
+    let showtimeDate = showtime.startAt instanceof Date && !isNaN(showtime.startAt)
+      ? showtime.startAt
+      : new Date(`${showtime.date}T${showtime.time}`);
+
+    let formattedDate = showtimeDate.toLocaleDateString('es-GT', {
+      day: 'numeric', month: 'long', year: 'numeric'
     });
+    let formattedTime = showtimeDate.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const userEmail = req.user?.email || 'correo@falso.com';
+
+    // Enviar correo
+    try {
+      await sendConfirmationEmail(userEmail, {
+        movie: movieTitle,
+        date: formattedDate,
+        time: formattedTime,
+        room: showtime.hall?.name || 'Sala desconocida',
+        seat: createdPurchase[0].seats.join(', '),
+        total: totalQ.toFixed(2),
+        code: confirmationCode
+      });
+      await Purchase.findByIdAndUpdate(createdPurchase[0]._id, { emailSent: true });
+    } catch (emailErr) {
+      console.error('❌ Error al enviar correo de confirmación:', emailErr);
+    }
+
+    res.status(201).json({ purchase: createdPurchase[0] });
   } catch (err) {
+    console.error('Error creando compra:', err);
     await session.abortTransaction();
-    console.error('Error in create purchase:', err);
-    res.status(500).json({ message: err.message || 'Error interno al crear compra' });
+    res.status(500).json({ message: err.message || 'Error interno del servidor al crear compra' });
   } finally {
     session.endSession();
   }
 };
-// Obtener compras de un usuario
+
+// ==========================================================
+// OBTENER COMPRAS DE UN USUARIO
+// ==========================================================
 exports.listByUser = async (req, res) => {
   try {
-    const userId = req.user._id;
+    const userId = req.user?._id;
     const purchases = await Purchase.find({ user: userId })
       .populate({
         path: 'showtime',
@@ -173,14 +249,12 @@ exports.listByUser = async (req, res) => {
       })
       .sort({ createdAt: -1 })
       .lean();
+
     res.json(purchases);
   } catch (err) {
     console.error('Error listing user purchases:', err);
     res.status(500).json({ message: 'Error al obtener las compras' });
   }
 };
-
-
-
 
 

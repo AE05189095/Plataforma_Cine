@@ -5,92 +5,107 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path'); // 🖼️ Necesario para manejar rutas de archivos estáticos
-const cookieParser = require('cookie-parser'); // 🛑 ¡NUEVO REQUIRE AGREGADO!
+const path = require('path'); // 🖼️ Manejo de archivos estáticos
+const cookieParser = require('cookie-parser'); // 🛑 Necesario para cookies
 const { helmet, apiLimiter } = require('./src/middleware/security');
 
 const authRoutes = require('./src/routes/auth.routes.js');
+const movieRoutes = require('./src/routes/movie.routes');
+const showtimeRoutes = require('./src/routes/showtime.routes');
+const purchaseRoutes = require('./src/routes/purchase.routes');
+const hallRoutes = require('./src/routes/hall.routes');
+const paymentRoutes = require('./src/routes/payment.routes');
+
 const http = require('http');
 const { Server } = require('socket.io');
+
+const Showtime = require('./src/models/Showtime'); // 🛑 IMPORTANTE para limpieza de locks
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
-// 🛑 Asegúrate de que tu .env contenga ALLOWED_ORIGIN=http://localhost:3000
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 // ==========================================================
-// CONFIGURACIÓN DE MIDDLEWARES Y CORS
+// CONFIGURACIÓN DE MIDDLEWARES
 // ==========================================================
-
 if (ALLOWED_ORIGIN === '*' && process.env.NODE_ENV === 'production') {
-  console.warn('⚠️  ALLOWED_ORIGIN está en "*" en producción. Considere restringirlo.');
+  console.warn('⚠️ ALLOWED_ORIGIN está en "*" en producción. Considera restringirlo.');
 }
 
-// 🛑 CONFIGURACIÓN DE CORS REVISADA (La clave es credentials: true)
 app.use(
   cors({
-    // Si ALLOWED_ORIGIN es '*', CORS lo manejará. Si es una URL específica, se usa.
-    origin: ALLOWED_ORIGIN, 
+    origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    // 🛑 Forzamos credentials: true para permitir el envío de cookies/tokens JWT
-    credentials: true, 
-    // Los headers son importantes para Axios
+    credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 
-// Security middlewares
 app.use(helmet());
-// Aplicar rate limiter a rutas /api para proteger endpoints públicos
 app.use('/api', apiLimiter);
-
-// Middleware para procesar JSON
 app.use(express.json());
+app.use(cookieParser());
 
-// 🛑 ¡CORRECCIÓN CLAVE! Este middleware puebla req.cookies para que AuthMiddleware funcione.
-app.use(cookieParser()); 
-
-// ==========================================================
-// 🖼️ CONFIGURACIÓN DE ARCHIVOS ESTÁTICOS (IMÁGENES)
-// ==========================================================
-// Permite que el navegador acceda a archivos dentro de la carpeta 'uploads'
-// Ejemplo: http://localhost:5000/uploads/poster.jpg
+// Archivos estáticos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==========================================================
-// RUTAS DE LA API
+// RUTAS
 // ==========================================================
-
 app.use('/api/auth', authRoutes);
-const movieRoutes = require('./src/routes/movie.routes');
-const showtimeRoutes = require('./src/routes/showtime.routes');
-const purchaseRoutes = require('./src/routes/purchase.routes');
-
 app.use('/api/movies', movieRoutes);
 app.use('/api/showtimes', showtimeRoutes);
 app.use('/api/purchases', purchaseRoutes);
+app.use('/api/halls', hallRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/', (req, res) => {
   res.send('Servidor de Plataforma Cine en línea.');
 });
 
 // ==========================================================
+// FUNCIÓN PARA LIMPIAR LOCKS EXPIRADOS
+// ==========================================================
+const LOCK_CLEAN_INTERVAL_MS = 30 * 1000; // Cada 30 segundos
+
+const cleanExpiredLocks = async () => {
+  const now = new Date();
+  try {
+    const expiredShowtimes = await Showtime.find({ 'seatsLocks.expiresAt': { $lt: now } }).populate('hall');
+    for (const st of expiredShowtimes) {
+      const oldLocks = st.seatsLocks.filter(lock => lock.expiresAt < now);
+      if (oldLocks.length > 0) {
+        st.seatsLocks = st.seatsLocks.filter(lock => lock.expiresAt >= now);
+        await st.save();
+
+        if (app.locals.io) {
+          const seatsLocked = st.seatsLocks.flatMap(l => l.seats);
+          const seatsBooked = st.seatsBooked || [];
+          const availableSeats = Math.max(0, (st.hall?.capacity || 0) - (seatsBooked.length + seatsLocked.length));
+
+          // Emitir eventos específicos por showtime
+          app.locals.io.emit(`updateLockedSeats-${st._id}`, { seatsLocked });
+          app.locals.io.emit(`updateReservedSeats-${st._id}`, { seatsBooked });
+          app.locals.io.emit(`updateAvailableSeats-${st._id}`, { availableSeats });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('❌ Error limpiando locks expirados:', err);
+  }
+};
+
+// ==========================================================
 // CONEXIÓN A MONGODB Y ARRANQUE DEL SERVIDOR
 // ==========================================================
-
-if (typeof MONGODB_URI !== 'string' || MONGODB_URI.trim() === '') {
-  console.error('❌ ERROR: la variable de entorno MONGODB_URI no está definida o no es una cadena válida.');
-  console.error('Asegúrate de crear un archivo .env en la carpeta server con una línea como:');
-  console.error('     MONGODB_URI=mongodb://usuario:password@host:puerto/nombre_basedatos');
+if (!MONGODB_URI || !MONGODB_URI.trim()) {
+  console.error('❌ ERROR: MONGODB_URI no está definido en .env');
   process.exit(1);
 }
-
-if (typeof JWT_SECRET !== 'string' || JWT_SECRET.trim() === '') {
-  console.error('❌ ERROR: la variable de entorno JWT_SECRET no está definida o es inválida.');
-  console.error('Define JWT_SECRET en el archivo .env dentro de la carpeta server. Ej:');
-  console.error('     JWT_SECRET=una_clave_muy_segura');
+if (!JWT_SECRET || !JWT_SECRET.trim()) {
+  console.error('❌ ERROR: JWT_SECRET no está definido en .env');
   process.exit(1);
 }
 
@@ -102,10 +117,8 @@ mongoose
     const server = http.createServer(app);
     const io = new Server(server, {
       cors: {
-        // La configuración del socket.io también debe usar el origen permitido
         origin: ALLOWED_ORIGIN === '*' ? true : ALLOWED_ORIGIN,
         methods: ['GET', 'POST'],
-        // Socket.io maneja sus propias credenciales/headers
       },
     });
 
@@ -115,6 +128,9 @@ mongoose
       console.log('Socket conectado:', socket.id);
       socket.on('disconnect', () => console.log('Socket desconectado:', socket.id));
     });
+
+    // 🚀 Iniciar limpieza automática de locks
+    setInterval(cleanExpiredLocks, LOCK_CLEAN_INTERVAL_MS);
 
     server.listen(PORT, () => {
       console.log(`🚀 Servidor Express + Socket.IO escuchando en el puerto ${PORT}`);

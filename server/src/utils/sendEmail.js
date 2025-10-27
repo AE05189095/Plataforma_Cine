@@ -1,30 +1,45 @@
-import nodemailer from 'nodemailer';
+const nodemailer = require('nodemailer');
 
-export const sendConfirmationEmail = async (to, purchaseDetails) => {
+async function sendConfirmationEmail(to, purchaseDetails) {
+  const testAccount = await nodemailer.createTestAccount();
+
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.ethereal.email',
+    port: 587,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: testAccount.user,
+      pass: testAccount.pass,
     },
   });
 
-  const { movie, date, time, room, seat, code } = purchaseDetails;
+  const { movie, date, time, room, seat, total, code } = purchaseDetails;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"CineGT" <${testAccount.user}>`,
     to,
     subject: 'Confirmación de compra - Plataforma Cine',
     html: `
-      <h2>¡Gracias por tu compra!</h2>
-      <p><strong>Película:</strong> ${movie}</p>
-      <p><strong>Fecha:</strong> ${date}</p>
-      <p><strong>Hora:</strong> ${time}</p>
-      <p><strong>Sala:</strong> ${room}</p>
-      <p><strong>Asiento:</strong> ${seat}</p>
-      <p><strong>Código de confirmación:</strong> ${code}</p>
+      <div style="background-color:#0D1B2A; color:#F8F9FA; padding:20px; font-family:sans-serif;">
+        <h2 style="color:#F1C40F;">🎬 Confirmación de compra - CineGT</h2>
+        <p>Hola,</p>
+        <p>Gracias por tu compra. Aquí están los detalles:</p>
+        <ul style="list-style:none; padding:0;">
+          <li><strong>Película:</strong> ${movie}</li>
+          <li><strong>Fecha:</strong> ${date}</li>
+          <li><strong>Hora:</strong> ${time}</li>
+          <li><strong>Sala:</strong> ${room}</li>
+          <li><strong>Asientos:</strong> ${seat}</li>
+          <li><strong>Total Pagado:</strong> Q${total}</li>
+          <li><strong>Código:</strong> <span style="color:#E63946;">${code}</span></li>
+        </ul>
+        <p>Nos vemos en el cine 🍿</p>
+      </div>
     `,
   };
 
-  await transporter.sendMail(mailOptions);
-};
+  const info = await transporter.sendMail(mailOptions);
+  console.log('📧 Email enviado:', info.messageId);
+  console.log('🔗 Vista previa:', nodemailer.getTestMessageUrl(info));
+}
+
+module.exports = { sendConfirmationEmail };

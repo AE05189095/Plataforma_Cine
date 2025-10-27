@@ -6,7 +6,16 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
   images: {
-    domains: ['m.media-amazon.com'], // permitimos imágenes externas de Inception
+    domains: [
+      'm.media-amazon.com', // posters desde Amazon
+      'image.tmdb.org', // TMDB (The Movie DB)
+      'images.unsplash.com', // Unsplash
+      'i.imgur.com', // Imgur
+      'lh3.googleusercontent.com', // Google user/content (avatars, etc.)
+      'cdn.pixabay.com', // Pixabay
+      'i.pinimg.com', // Pinterest thumbnails
+      'res.cloudinary.com', // Cloudinary-hosted images
+    ],
   },
 };
 
