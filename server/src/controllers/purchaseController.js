@@ -124,12 +124,28 @@ exports.create = async (req, res) => {
         startAt: new Date(`${todayStr}T18:30`)
       };
     } else {
+      // 1. Verificar que los asientos no estén ocupados ANTES de actualizar
+      const showtimeToCheck = await Showtime.findById(showtimeId).session(session);
+      if (!showtimeToCheck) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Showtime no encontrado' });
+      }
+      const alreadyOccupied = seats.filter(seat => (showtimeToCheck.seatsBooked || []).includes(seat));
+      if (alreadyOccupied.length > 0) {
+        await session.abortTransaction();
+        return res.status(409).json({
+          message: `Los siguientes asientos ya están ocupados: ${alreadyOccupied.join(', ')}`,
+        });
+      }
+
+      // 2. Actualizar showtime si los asientos están libres
       await Showtime.findByIdAndUpdate(
         showtimeId,
         { $push: { seatsBooked: { $each: seats } } },
         { session }
       );
 
+      // 3. Obtener el showtime actualizado para el resto de la lógica
       showtime = await Showtime.findById(showtimeId)
         .populate('movie')
         .populate('hall')
@@ -138,7 +154,7 @@ exports.create = async (req, res) => {
 
       if (!showtime) {
         await session.abortTransaction();
-        return res.status(404).json({ message: 'Showtime no encontrado' });
+        return res.status(404).json({ message: 'Showtime no encontrado después de actualizar' });
       }
 
       movieTitle = showtime.movie?.title || 'Película Desconocida';
@@ -163,7 +179,7 @@ exports.create = async (req, res) => {
     // Emitir eventos de socket
     try {
       const io = req.app.get('io');
-      if (io) {
+      if (io && !isSimulated) { // Solo emitir para showtimes reales
         const freshShowtime = await Showtime.findById(showtimeId).lean();
         const occupiedSeats = freshShowtime?.seatsBooked || [];
         io.emit('showtimeUpdated', {
@@ -171,7 +187,7 @@ exports.create = async (req, res) => {
           seatsBooked: [...occupiedSeats],
           availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - occupiedSeats.length),
         });
-        io.emit('seatsLocked', { showtimeId, seats: [] });
+        io.emit('seatsLocked', { showtimeId, seats: [] }); // Limpiar locks para todos
       }
     } catch (e) {
       console.error('Error emitiendo eventos:', e);
@@ -240,3 +256,5 @@ exports.listByUser = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener las compras' });
   }
 };
+
+
