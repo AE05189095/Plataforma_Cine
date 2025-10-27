@@ -57,10 +57,7 @@ const IMAGE_MAP: Record<string, string> = {
     "parasite": "/images/parasite.jpg",
     "la la land": "/images/la-la-land.jpg",
     "incepcion": "/images/incepcion.jpg",
-    // Se eliminó la entrada estática de "200% lobo" para evitar que aparezca
-    // una película inyectada cuando no hay datos en la API.
 };
-
 
 export default function HomePage() {
     const router = useRouter();
@@ -82,15 +79,11 @@ export default function HomePage() {
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
         const getImage = (m: RawMovie): string => {
-            // Preferimos la URL de la base de datos (posterUrl) si existe
-            if (m.posterUrl && typeof m.posterUrl === 'string' && m.posterUrl.trim() !== '') return m.posterUrl as string;
-
+            if (m.posterUrl && typeof m.posterUrl === 'string' && m.posterUrl.trim() !== '') return m.posterUrl;
             if (m.title) {
                 const key = m.title.toLowerCase().trim();
                 if (IMAGE_MAP[key]) return IMAGE_MAP[key];
             }
-
-            // fallback al slug automático
             if (m.title) return `/images/${(m.slug || createSlug(m.title)).toLowerCase()}.jpg`;
             return "/images/movie-default.svg";
         };
@@ -105,12 +98,14 @@ export default function HomePage() {
                     const movieGenres = Array.isArray(m.genres) ? m.genres : [];
                     return {
                         title: m.title || "Sin título",
-                        // Usar posterUrl si está en la DB, sino fallback local
                         image: getImage(m),
-                        // rating en la UI se muestra como etiqueta (PG-13, R, etc.) — si en DB está un número lo convertimos
-                        rating: typeof m.rating === 'number' ? String(m.rating) : (m.rating as any) || "PG-13",
-                        // score será el número/contador cuando exista
-                        score: (typeof m.rating === 'number' && m.rating > 0) ? String(m.rating) : (m.ratingCount ? String(m.ratingCount) : 'N/A'),
+                        rating: m.rating !== undefined && m.rating !== null ? String(m.rating) : "PG-13",
+                        score:
+                            m.rating !== undefined && m.rating !== null && typeof m.rating === 'number' && m.rating > 0
+                                ? String(m.rating)
+                                : m.ratingCount !== undefined && m.ratingCount !== null
+                                    ? String(m.ratingCount)
+                                    : 'N/A',
                         genre: movieGenres[0] || "General",
                         genres: movieGenres,
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
@@ -123,9 +118,6 @@ export default function HomePage() {
                 if (mounted) setApiError(false);
             } catch (err) {
                 console.warn("Error al cargar películas:", err);
-                // No inyectamos una película ficticia. Dejamos el listado vacío
-                // y mostramos un banner de error para que sólo se muestren
-                // películas provenientes de la base de datos.
                 if (mounted) {
                     setAllMovies([]);
                     setApiError(true);
@@ -135,9 +127,8 @@ export default function HomePage() {
 
         loadMovies();
 
-        // Refrescar automáticamente cada 15s para que los cambios desde admin se reflejen en el Home
+        // Refrescar automáticamente cada 15s
         const interval = setInterval(() => { if (mounted) loadMovies(); }, 15000);
-
         return () => { mounted = false; clearInterval(interval); };
     }, []);
 
@@ -210,13 +201,13 @@ export default function HomePage() {
                             <MovieCard key={movie.title + index} {...movie} />
                         ))
                     ) : (
-                            <div className="col-span-full text-center">
-                                {apiError ? (
-                                    <p className="text-xl text-red-400">Películas temporalmente indisponibles — no se pudieron cargar desde el servidor.</p>
-                                ) : (
-                                    <p className="text-xl text-gray-400">No se encontraron películas que coincidan con los filtros aplicados.</p>
-                                )}
-                            </div>
+                        <div className="col-span-full text-center">
+                            {apiError ? (
+                                <p className="text-xl text-red-400">Películas temporalmente indisponibles — no se pudieron cargar desde el servidor.</p>
+                            ) : (
+                                <p className="text-xl text-gray-400">No se encontraron películas que coincidan con los filtros aplicados.</p>
+                            )}
+                        </div>
                     )}
                 </section>
             </main>

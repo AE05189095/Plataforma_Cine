@@ -35,17 +35,19 @@ export default function AdminSalasPage() {
       const res = await fetch(`${API_BASE}/api/halls?groupByMovie=1`, { credentials: 'include' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data && data.groups) {
-        setGroups(data.groups || []);
+      const asObj = data as Record<string, unknown>;
+      if (asObj && 'groups' in asObj) {
+        const groupsData = (asObj.groups as unknown as HallGroup[]) || [];
+        setGroups(groupsData);
         // También mantener listado plano por compatibilidad
-        const flat = data.groups.flatMap((g: any) => g.halls || []);
+        const flat = groupsData.flatMap((g: HallGroup) => g.halls || []);
         setHalls(flat || []);
       } else {
-        setHalls(data || []);
+        setHalls(data as Hall[] || []);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching halls:', err);
-      setError('No se pudo cargar las salas');
+      setError((err as Error)?.message || 'No se pudo cargar las salas');
     } finally {
       setLoading(false);
     }
@@ -107,8 +109,8 @@ export default function AdminSalasPage() {
                     <h3 className="font-semibold" style={{ color: 'var(--foreground)' }}>{h.name}{g.movie ? ` - ${g.movie.title}` : ''}</h3>
                     <p style={{ color: 'rgba(255,255,255,0.85)' }}>{h.capacity} asientos</p>
                     <p style={{ color: h.isActive ? 'var(--color-link)' : 'gray' }}>{h.isActive ? 'Activa' : 'Inactiva'}</p>
-                    <div className="mt-3 flex gap-2">
-                      <button onClick={() => setEditingHall({ ...h, movie: (g.movie && (g.movie._id as any)) || undefined })} className="px-2 py-1 bg-blue-600 text-white rounded">Editar</button>
+                      <div className="mt-3 flex gap-2">
+                      <button onClick={() => setEditingHall({ ...h, movie: g.movie?._id || undefined })} className="px-2 py-1 bg-blue-600 text-white rounded">Editar</button>
                       <button onClick={async () => { if (!confirm('¿Eliminar sala?')) return; try { const res = await fetch(`${API_BASE}/api/halls/${h._id}`, { method: 'DELETE', credentials: 'include' }); if (res.status !== 204 && !res.ok) throw new Error(`HTTP ${res.status}`); await fetchHalls(); } catch (err) { console.error(err); alert('Error eliminando sala'); } }} className="px-2 py-1 bg-red-600 text-white rounded">Eliminar</button>
                     </div>
                   </div>
@@ -141,11 +143,11 @@ export default function AdminSalasPage() {
               </label>
               <label className="flex flex-col">
                 <span className="text-sm text-gray-300">Capacidad</span>
-                <input type="number" value={newHall.capacity as any} onChange={e => setNewHall({ ...newHall, capacity: Number(e.target.value) })} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <input type="number" value={newHall.capacity ?? ''} onChange={e => setNewHall({ ...newHall, capacity: Number(e.target.value) })} className="mt-1 p-2 bg-gray-800 text-white rounded" />
               </label>
               <label className="flex flex-col col-span-2">
                 <span className="text-sm text-gray-300">Asignar a película (opcional)</span>
-                <select value={newHall.movie as any || ''} onChange={e => setNewHall({ ...newHall, movie: e.target.value || undefined })} className="mt-1 p-2 bg-gray-800 text-white rounded">
+                <select value={newHall.movie ?? ''} onChange={e => setNewHall({ ...newHall, movie: e.target.value || undefined })} className="mt-1 p-2 bg-gray-800 text-white rounded">
                   <option value="">-- Ninguna --</option>
                   {movies.map(m => <option key={m._id} value={m._id}>{m.title || m._id}</option>)}
                 </select>
@@ -175,11 +177,11 @@ export default function AdminSalasPage() {
               </label>
               <label className="flex flex-col">
                 <span className="text-sm text-gray-300">Capacidad</span>
-                <input type="number" value={editingHall.capacity as any} onChange={e => setEditingHall({ ...editingHall, capacity: Number(e.target.value) })} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <input type="number" value={editingHall.capacity ?? ''} onChange={e => setEditingHall({ ...editingHall, capacity: Number(e.target.value) })} className="mt-1 p-2 bg-gray-800 text-white rounded" />
               </label>
               <label className="flex flex-col col-span-2">
                 <span className="text-sm text-gray-300">Asignar a película (opcional)</span>
-                <select value={editingHall.movie as any || ''} onChange={e => setEditingHall({ ...editingHall, movie: e.target.value || undefined })} className="mt-1 p-2 bg-gray-800 text-white rounded">
+                <select value={editingHall.movie ?? ''} onChange={e => setEditingHall({ ...editingHall, movie: e.target.value || undefined })} className="mt-1 p-2 bg-gray-800 text-white rounded">
                   <option value="">-- Ninguna --</option>
                   {movies.map(m => <option key={m._id} value={m._id}>{m.title || m._id}</option>)}
                 </select>

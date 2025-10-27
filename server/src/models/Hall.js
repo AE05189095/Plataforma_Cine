@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const hallSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    // Relacion opcional con Movie: permite asociar una sala a una película
+    // Relación opcional con Movie: permite asociar una sala a una película
     movie: { type: mongoose.Schema.Types.ObjectId, ref: 'Movie' },
     capacity: { type: Number, required: true },
     layout: { type: Object }, // opcionalmente describir filas/columnas

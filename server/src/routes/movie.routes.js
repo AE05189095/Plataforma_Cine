@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/movieController');
-const imageDomains = require('../controllers/imageDomainsController');
+const imageDomains = require('../controllers/imageDomainsController'); // para dominios de imágenes
 
+// Rutas CRUD para películas
 router.get('/', controller.list);
 router.get('/:slug', controller.getBySlug);
 router.post('/', controller.create);

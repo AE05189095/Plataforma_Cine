@@ -276,7 +276,6 @@ exports.create = async (req, res) => {
     const durationMin = typeof movie.duration === 'number' && movie.duration > 0 ? movie.duration : DEFAULT_DURATION_MIN;
     const endAt = new Date(startAt.getTime() + durationMin * 60000);
 
-    // Buscar showtimes en la misma sala y comprobar solapamiento en JS
     const existing = await Showtime.find({ hall: hall._id, isActive: true }).populate('movie').lean();
     for (const st of existing) {
       const sStart = new Date(st.startAt);
@@ -318,7 +317,6 @@ exports.update = async (req, res) => {
     const existing = await Showtime.findById(id);
     if (!existing) return res.status(404).json({ message: 'Función no encontrada' });
 
-    // Si cambian movie/hall/startAt necesitamos recomputar endAt y validar solapamiento
     const movieId = payload.movie || existing.movie;
     const hallId = payload.hall || existing.hall;
     const startAt = payload.startAt ? new Date(payload.startAt) : new Date(existing.startAt);
@@ -331,7 +329,6 @@ exports.update = async (req, res) => {
     const durationMin = typeof movie.duration === 'number' && movie.duration > 0 ? movie.duration : DEFAULT_DURATION_MIN;
     const endAt = new Date(startAt.getTime() + durationMin * 60000);
 
-    // Buscar otros showtimes en la misma sala y comprobar solapamiento
     const others = await Showtime.find({ hall: hallId, isActive: true, _id: { $ne: existing._id } }).populate('movie').lean();
     for (const st of others) {
       const sStart = new Date(st.startAt);
@@ -341,7 +338,6 @@ exports.update = async (req, res) => {
       }
     }
 
-    // Aplicar cambios permitidos
     existing.movie = movie._id;
     existing.hall = hall._id;
     existing.startAt = startAt;
@@ -370,7 +366,6 @@ exports.remove = async (req, res) => {
     const existing = await Showtime.findById(id);
     if (!existing) return res.status(404).json({ message: 'Función no encontrada' });
 
-    // Soft delete
     existing.isActive = false;
     await existing.save();
 

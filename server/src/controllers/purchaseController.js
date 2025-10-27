@@ -4,6 +4,8 @@ const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
 const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
+const Stripe = require('stripe');
+const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 // ==========================================================
 // LOCK DE ASIENTOS
@@ -58,12 +60,12 @@ exports.create = async (req, res) => {
     session.startTransaction();
 
     const userId = req.user?._id;
-    const { showtimeId, paymentInfo } = req.body;
-    let { seats } = req.body;
+    const { paymentIntentId } = req.body;
+    let { showtimeId, seats } = req.body; // Estos vienen del cliente ahora
 
-    if (!userId || !showtimeId || !Array.isArray(seats) || seats.length === 0) {
+    if (!userId || !paymentIntentId) {
       await session.abortTransaction();
-      return res.status(400).json({ message: 'Datos incompletos' });
+      return res.status(400).json({ message: 'Faltan datos del usuario o del pago.' });
     }
 
     seats = seats.map(s => String(s).trim().toUpperCase()).filter(Boolean);
@@ -71,6 +73,34 @@ exports.create = async (req, res) => {
 
     let showtime = null;
     let movieTitle = null;
+    let totalQ = 0;
+    let paymentInfo = {};
+
+    // Si el cliente pasó un paymentIntentId, validarlo con Stripe (fuente de verdad)
+    if (paymentIntentId && stripe) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+        if (pi.status !== 'succeeded') {
+          await session.abortTransaction();
+          return res.status(400).json({ message: 'Pago no confirmado' });
+        }
+
+        // Extraer metadatos guardados al crear el pago
+        showtimeId = pi.metadata.showtimeId || showtimeId;
+        seats = pi.metadata.seats ? pi.metadata.seats.split(',') : seats;
+        totalQ = pi.amount / 100; // Stripe usa centavos
+
+        const charge = pi.charges?.data[0];
+        const cardLast4 = charge?.payment_method_details?.card?.last4;
+        paymentInfo = { method: 'card', paymentIntentId, card: { last4: cardLast4 } };
+
+      } catch (err) {
+        console.error('Error verificando PaymentIntent:', err);
+        await session.abortTransaction();
+        return res.status(500).json({ message: 'Error verificando pago' });
+      }
+    }
+
     const isSimulated = !mongoose.Types.ObjectId.isValid(showtimeId) || showtimeId.includes('-gen-');
 
     if (isSimulated) {
@@ -94,12 +124,28 @@ exports.create = async (req, res) => {
         startAt: new Date(`${todayStr}T18:30`)
       };
     } else {
+      // 1. Verificar que los asientos no estén ocupados ANTES de actualizar
+      const showtimeToCheck = await Showtime.findById(showtimeId).session(session);
+      if (!showtimeToCheck) {
+        await session.abortTransaction();
+        return res.status(404).json({ message: 'Showtime no encontrado' });
+      }
+      const alreadyOccupied = seats.filter(seat => (showtimeToCheck.seatsBooked || []).includes(seat));
+      if (alreadyOccupied.length > 0) {
+        await session.abortTransaction();
+        return res.status(409).json({
+          message: `Los siguientes asientos ya están ocupados: ${alreadyOccupied.join(', ')}`,
+        });
+      }
+
+      // 2. Actualizar showtime si los asientos están libres
       await Showtime.findByIdAndUpdate(
         showtimeId,
         { $push: { seatsBooked: { $each: seats } } },
         { session }
       );
 
+      // 3. Obtener el showtime actualizado para el resto de la lógica
       showtime = await Showtime.findById(showtimeId)
         .populate('movie')
         .populate('hall')
@@ -108,46 +154,10 @@ exports.create = async (req, res) => {
 
       if (!showtime) {
         await session.abortTransaction();
-        return res.status(404).json({ message: 'Showtime no encontrado' });
+        return res.status(404).json({ message: 'Showtime no encontrado después de actualizar' });
       }
 
       movieTitle = showtime.movie?.title || 'Película Desconocida';
-    }
-
-    // ==========================================================
-    // Cálculo total según fila de asiento
-    // ==========================================================
-    let totalQ = 0;
-    // Aquí defines los precios por fila (ajusta según tu sala)
-    const priceMap = { A: 65, B: 65, C: 55, D: 55, E: 45, F: 45, G: 45, H: 45 };
-    seats.forEach(seatId => {
-      const row = seatId[0].toUpperCase();
-      totalQ += priceMap[row] || 45;
-    });
-
-    // Sanitizar paymentInfo
-    let safePayment = {};
-    try {
-      if (paymentInfo && typeof paymentInfo === 'object') {
-        const m = paymentInfo.method;
-        if (m === 'card' && paymentInfo.card) {
-          const c = paymentInfo.card;
-          safePayment = {
-            method: 'card',
-            card: {
-              last4: c.number ? String(c.number).slice(-4) : undefined,
-              name: c.name || undefined,
-              expMonth: c.expMonth || undefined,
-              expYear: c.expYear || undefined,
-            },
-          };
-        } else if (m === 'paypal' && paymentInfo.paypal) {
-          safePayment = { method: 'paypal', paypal: { email: paymentInfo.paypal.email || '' } };
-        }
-      }
-    } catch (e) {
-      console.warn('Error sanitizando paymentInfo:', e);
-      safePayment = {};
     }
 
     const confirmationCode = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -159,7 +169,7 @@ exports.create = async (req, res) => {
       seats,
       totalPrice: totalQ,
       status: 'reserved',
-      paymentInfo: safePayment,
+      paymentInfo: paymentInfo,
       confirmationCode,
       emailSent: false,
     }], { session });
@@ -169,7 +179,7 @@ exports.create = async (req, res) => {
     // Emitir eventos de socket
     try {
       const io = req.app.get('io');
-      if (io) {
+      if (io && !isSimulated) { // Solo emitir para showtimes reales
         const freshShowtime = await Showtime.findById(showtimeId).lean();
         const occupiedSeats = freshShowtime?.seatsBooked || [];
         io.emit('showtimeUpdated', {
@@ -177,7 +187,7 @@ exports.create = async (req, res) => {
           seatsBooked: [...occupiedSeats],
           availableSeats: Math.max(0, (showtime.hall?.capacity || 0) - occupiedSeats.length),
         });
-        io.emit('seatsLocked', { showtimeId, seats: [] });
+        io.emit('seatsLocked', { showtimeId, seats: [] }); // Limpiar locks para todos
       }
     } catch (e) {
       console.error('Error emitiendo eventos:', e);
@@ -246,3 +256,5 @@ exports.listByUser = async (req, res) => {
     res.status(500).json({ message: 'Error al obtener las compras' });
   }
 };
+
+

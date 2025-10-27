@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { API_BASE, TOKEN_KEY } from "../../../lib/config";
 
 type Movie = { _id: string; title: string; duration?: number };
@@ -32,21 +32,23 @@ export default function AdminHorariosPage() {
 
   const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
 
-  useEffect(() => {
-    loadAll();
-  }, []);
-
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       await Promise.all([loadShowtimes(), loadMovies(), loadHalls()]);
-    } catch (err: any) {
-      setError(err?.message || 'Error cargando datos');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Error cargando datos');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  
 
   const loadShowtimes = async () => {
     const res = await fetch(`${API_BASE}/api/showtimes`);
@@ -81,8 +83,9 @@ export default function AdminHorariosPage() {
     const movieId = typeof st.movie === 'string' ? st.movie : (st.movie as Movie)?._id;
     const hallId = typeof st.hall === 'string' ? st.hall : (st.hall as Hall)?._id;
     const dt = new Date(st.startAt);
-    const isoDate = dt.toISOString().slice(0, 10);
-    const isoTime = dt.toISOString().slice(11, 16);
+    // usar representación en zona local adecuada para inputs (YYYY-MM-DD, HH:MM)
+    const isoDate = dt.toLocaleDateString('en-CA'); // -> 2025-12-25
+    const isoTime = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // -> 14:30
     setForm({ movie: movieId || '', hall: hallId || '', date: isoDate, time: isoTime, price: String(st.price || '') });
     setModalOpen(true);
   };
@@ -94,7 +97,7 @@ export default function AdminHorariosPage() {
       if (!form.movie || !form.hall || !form.date || !form.time) return setError('Todos los campos son requeridos');
       const startAt = new Date(`${form.date}T${form.time}:00`).toISOString();
       const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0 };
-      const headers: any = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let res;
@@ -112,8 +115,8 @@ export default function AdminHorariosPage() {
 
       setModalOpen(false);
       await loadShowtimes();
-    } catch (err: any) {
-      setError(err?.message || 'Error inesperado');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Error inesperado');
     }
   };
 
@@ -121,16 +124,16 @@ export default function AdminHorariosPage() {
     if (!confirm('¿Desactivar esta función?')) return;
     setError(null);
     try {
-      const headers: any = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/api/showtimes/${id}`, { method: 'DELETE', headers });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data?.message || 'No se pudo eliminar');
       }
       await loadShowtimes();
-    } catch (err: any) {
-      setError(err?.message || 'Error eliminando');
+    } catch (err: unknown) {
+      setError((err as Error)?.message || 'Error eliminando');
     }
   };
 
@@ -164,7 +167,7 @@ export default function AdminHorariosPage() {
             </tr>
           </thead>
           <tbody style={{ color: 'rgba(255,255,255,0.9)' }}>
-            {loading && (
+              {loading && (
               <tr><td colSpan={6} className="px-4 py-6 text-center">Cargando...</td></tr>
             )}
             {!loading && showtimes.length === 0 && (
@@ -174,8 +177,9 @@ export default function AdminHorariosPage() {
               const movie = typeof st.movie === 'string' ? null : (st.movie as Movie);
               const hall = typeof st.hall === 'string' ? null : (st.hall as Hall);
               const dt = new Date(st.startAt);
-              const dateStr = dt.toISOString().slice(0,10);
-              const timeStr = dt.toISOString().slice(11,16);
+              // Mostrar fecha/hora en zona local (evitar confusión con toISOString que usa UTC)
+              const dateStr = dt.toLocaleDateString('en-CA');
+              const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
               return (
                 <tr key={st._id} className="border-t border-gray-800">
                   <td className="px-4 py-3">{movie?.title || '—'}</td>

@@ -114,7 +114,17 @@ export default function ProfilePage() {
                 <div className="font-semibold text-white">***********</div>
               </div>
 
-              <div className="flex gap-3">
+              {/* Enlace al historial de entradas */}
+              <div className="mt-4">
+                <a
+                  href="/profile/UserHistory"
+                  className="text-amber-400 underline"
+                >
+                  Ver historial de entradas
+                </a>
+              </div>
+
+              <div className="flex gap-3 mt-4">
                 <button onClick={() => setShowChange(true)} className="px-4 py-2 bg-amber-500 text-black rounded">Cambiar contraseña</button>
                 <button onClick={handleLogout} className="px-4 py-2 bg-red-600 rounded">Cerrar sesión</button>
               </div>
@@ -134,7 +144,6 @@ export default function ProfilePage() {
           ) : (
             <div className="text-slate-400">No hay datos de usuario disponibles.</div>
           )}
-
         </div>
       </main>
     </div>
