@@ -20,6 +20,7 @@ interface ShowtimeResponse {
   movie?: { title?: string };
   startAt?: string;
   hall?: { name?: string };
+  price?: number;
 }
 
 interface PaymentPayload {
@@ -161,14 +162,15 @@ export default function ComprarPage() {
         setExpirationTime(tenMinutesLater);
       }
 
-      const successfullyLockedSeats = seatsToLock.filter(s => data.userLockedSeats?.includes(s.id));
-      setSelected(successfullyLockedSeats);
+  // Don't overwrite local selection immediately with server response.
+  // Keep client-managed `selected` so users can freely select/deselect while locks
+  // are being synchronized. We still update `reserved` and `expirationTime`.
 
     } catch (error) { 
       console.error('Error updating seat locks:', error);
       setSelected(seatsToLock);
     }
-  }, [showtime?._id, showtimeId, router, expirationTime]);
+  }, [showtime, showtimeId, router, expirationTime]);
 
   // =============================
   // HANDLE SELECTION
@@ -209,34 +211,13 @@ export default function ComprarPage() {
       setToast({ open: true, message: 'Selecciona asientos primero', type: 'error' });
       return;
     }
-    const total = selected.reduce((acc, s) => acc + (s.status === 'premium' ? 65 : 45), 0);
+    const perSeat = typeof showtime?.price === 'number' ? showtime!.price : null;
+    const total = selected.reduce((acc, s) => {
+      if (perSeat !== null) return acc + perSeat;
+      return acc + (s.status === 'premium' ? 65 : 45);
+    }, 0);
     setPaymentModal({ open: true, seats: selected, total });
-  }, [selected]);
-
-  const handlePaymentConfirm = useCallback(async (paymentInfo: PaymentPayload) => {
-    if (!paymentModal) return;
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const res = await fetch(`${API_BASE}/api/purchases`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ showtimeId, seats: paymentModal.seats.map(s => s.id), paymentInfo }),
-      });
-      if (!res.ok) throw new Error('Error en la compra');
-
-      const body = await res.json();
-      setOccupied(body.showtime?.seatsBooked || []);
-      setReserved([]);
-      setSelected([]);
-      setExpirationTime(null);
-      setPaymentModal(null);
-
-      setToast({ open: true, message: 'Compra exitosa', type: 'success' });
-      setTimeout(() => router.push('/mis-compras'), 2000);
-    } catch {
-      setToast({ open: true, message: 'Error en la compra', type: 'error' });
-    }
-  }, [paymentModal, router, showtimeId]);
+  }, [selected, showtime]);
 
   // =============================
   // RENDER
@@ -255,7 +236,7 @@ export default function ComprarPage() {
               <div className="text-slate-400 mb-4">
                 Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —
                 Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —
-                Precio: <span className="text-white font-semibold">{formatCurrency(getPriceForHall(showtime.hall?.name))}</span>
+                Precio: <span className="text-white font-semibold">{formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))}</span>
               </div>
             ) : (
               <div className="text-red-400 mb-4">Error al cargar la función</div>
@@ -279,6 +260,7 @@ export default function ComprarPage() {
                   expirationTime={expirationTime}
                   onExpiration={handleExpiration}
                   onPurchase={handlePurchase}
+                  perSeatPrice={typeof showtime?.price === 'number' ? showtime.price : null}
                 />
               </div>
             </div>
@@ -287,9 +269,10 @@ export default function ComprarPage() {
 
         {paymentModal?.open && (
           <PaymentMethods
-            amount={formatCurrency(paymentModal.total)}
+            amount={paymentModal.total}
             onCancel={() => setPaymentModal(null)}
-            onConfirm={handlePaymentConfirm}
+            showtimeId={showtimeId || ''}
+            seatsSelected={paymentModal.seats.map(s => s.id)}
           />
         )}
 

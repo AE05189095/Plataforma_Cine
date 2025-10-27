@@ -15,10 +15,15 @@ interface ReservationSummaryProps {
     expirationTime: Date | null; 
     onExpiration: () => void;
     onPurchase: () => void;
+    perSeatPrice?: number | null; // si se pasa, usar por asiento
 }
 
-const calculateTotal = (seats: Seat[]) =>
-    seats.reduce((acc, s) => acc + (s.status === 'premium' ? 65 : 45), 0);
+const calculateTotal = (seats: Seat[], perSeatPrice?: number | null) => {
+    if (typeof perSeatPrice === 'number' && !Number.isNaN(perSeatPrice)) {
+        return seats.length * perSeatPrice;
+    }
+    return seats.reduce((acc, s) => acc + (s.status === 'premium' ? 65 : 45), 0);
+};
 
 const CountdownTimer = ({ expirationTime, onExpiration }: { expirationTime: Date, onExpiration: () => void }) => {
     const [timeLeft, setTimeLeft] = useState(Math.max(0, Math.floor((expirationTime.getTime() - new Date().getTime()) / 1000)));
@@ -47,8 +52,8 @@ const CountdownTimer = ({ expirationTime, onExpiration }: { expirationTime: Date
     );
 };
 
-export default function ReservationSummary({ seats, showtimeId, expirationTime, onExpiration, onPurchase }: ReservationSummaryProps) {
-    const total = calculateTotal(seats);
+export default function ReservationSummary({ seats, showtimeId, expirationTime, onExpiration, onPurchase, perSeatPrice }: ReservationSummaryProps) {
+    const total = calculateTotal(seats, perSeatPrice ?? null);
 
     return (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 w-full">
