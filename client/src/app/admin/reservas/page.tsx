@@ -3,7 +3,6 @@ import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 
-import { Users, Calendar, DollarSign, Search, Download } from "lucide-react";
 import { API_BASE, TOKEN_KEY } from "../../../lib/config";
 
 
@@ -237,24 +236,30 @@ export default function AdminReservasPage() {
           style={headerStyle}
         />
 
-        {(filtros.user || filtros.movie || filtros.estado || filtros.date) && (
+       <div className="flex gap-2 items-center">
+          {(filtros.user || filtros.movie || filtros.estado || filtros.date) ? (
+            <button
+              type="button"
+              onClick={() => setFiltros({ id: '', user: '', date: '', movie: '', estado: '' })}
+              className="border px-4 py-2 rounded text-white hover:bg-gray-700"
+              style={headerStyle}
+            >
+              Limpiar filtros
+            </button>
+          ) : (
+            <div className="border px-4 py-2 rounded invisible" style={headerStyle}>
+              Limpiar filtros
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={() => setFiltros({ id: '', user: '', date: '', movie: '', estado: '' })}
-            className="border px-4 py-2 rounded text-white hover:bg-gray-700"
+            className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-45"
+            style={headerStyle}
           >
-            Limpiar filtros
+            Exportar
           </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => exportarCSV(reservas)}
-          className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-80"
-          style={headerStyle}
-        >
-          Exportar
-        </button>
+        </div>
 
 
 
