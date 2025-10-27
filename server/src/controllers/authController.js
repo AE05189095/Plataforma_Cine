@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const Log = require("../models/Log");
 const User = require("../models/User");
 const Admin = require("../models/Admin");
 const Colab = require("../models/Colab");
@@ -71,12 +72,21 @@ const loginController = async (req, res) => {
       expiresIn: "30m",
     });
 
+// Registrar log de inicio de sesión
+     await Log.create({
+      usuario: user._id,
+      role: user.role,
+      accion: "inicio_sesion",
+      descripcion: `El usuario ${user.username} inició sesión.`,
+    });
+
     // Enviar respuesta
     return res.json({
       token,
       message: "Inicio de sesión exitoso.",
       user: {
-        id: user._id, username: user.username, email: user.email, role,},});
+        id: user._id, username: user.username, email: user.email, role: user.role,},
+});
   } catch (error) {
     console.error("Error durante el login:", error);
     res.status(500).json({ message: "Error interno del servidor." });
@@ -150,7 +160,7 @@ if (role === "colaborador") {
   user = await Admin.create({username, email, password}); // Pasamos el password sin hashear (asumo hook)
 } else {
   // Este modelo (User) SÍ necesita el hash si no tiene hook, pero si lo tiene, usamos 'password'
-  user = await User.create({username, email, password: hashedPassword, role});
+  user = await User.create({username, email, password, role});
 }
 
 res.status(201).json({
@@ -194,6 +204,18 @@ const loginByModel = async (req, res, Model, fixedRole) => {
     const match = await user.comparePassword(password);
     if (!match)
       return res.status(401).json({ message: "Credenciales inválidas" });
+//log inicio de sesion
+try {
+  await Log.create({
+    usuario: user._id,
+    role: fixedRole,
+    accion: "inicio_sesion",
+    descripcion: `El ${fixedRole} ${user.username || user.email} inició sesión.`,
+  });
+} catch (logErr) {
+  console.error('Error al crear log de login:', logErr);
+}
+
 
     const token = jwt.sign(
       { userId: user._id, role: fixedRole },
@@ -308,6 +330,14 @@ const changePasswordController = async (req, res) => {
 
         user.password = newPassword; 
         await user.save();
+
+// Registra log de modificación
+await Log.create({
+  usuario: user._id,
+  role: user.role || req.user?.role, 
+  accion: "modificacion",
+  descripcion: `El usuario ${user.username} cambió su contraseña.`,
+});
 
         res.status(200).json({ message: "Contraseña cambiada exitosamente." });
 

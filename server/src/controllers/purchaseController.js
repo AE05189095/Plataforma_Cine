@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
+const Log = require("../models/Log");
 const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 
@@ -163,6 +164,18 @@ exports.create = async (req, res) => {
       confirmationCode,
       emailSent: false,
     }], { session });
+
+//log de compra
+try {
+  await Log.create({
+    usuario: userId,
+    role: req.user?.role || 'cliente',
+    accion: 'compra',
+    descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
+  });
+} catch (logErr) {
+  console.error('Error registrando log de compra:', logErr);
+}
 
     await session.commitTransaction();
 
