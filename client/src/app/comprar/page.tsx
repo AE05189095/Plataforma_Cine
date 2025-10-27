@@ -219,31 +219,6 @@ export default function ComprarPage() {
     setPaymentModal({ open: true, seats: selected, total });
   }, [selected, showtime]);
 
-  const handlePaymentConfirm = useCallback(async (paymentInfo: PaymentPayload) => {
-    if (!paymentModal) return;
-    try {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const res = await fetch(`${API_BASE}/api/purchases`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ showtimeId, seats: paymentModal.seats.map(s => s.id), paymentInfo }),
-      });
-      if (!res.ok) throw new Error('Error en la compra');
-
-      const body = await res.json();
-      setOccupied(body.showtime?.seatsBooked || []);
-      setReserved([]);
-      setSelected([]);
-      setExpirationTime(null);
-      setPaymentModal(null);
-
-      setToast({ open: true, message: 'Compra exitosa', type: 'success' });
-      setTimeout(() => router.push('/mis-compras'), 2000);
-    } catch {
-      setToast({ open: true, message: 'Error en la compra', type: 'error' });
-    }
-  }, [paymentModal, router, showtimeId]);
-
   // =============================
   // RENDER
   // =============================
@@ -294,9 +269,10 @@ export default function ComprarPage() {
 
         {paymentModal?.open && (
           <PaymentMethods
-            amount={formatCurrency(paymentModal.total)}
+            amount={paymentModal.total}
             onCancel={() => setPaymentModal(null)}
-            onConfirm={handlePaymentConfirm}
+            showtimeId={showtimeId || ''}
+            seatsSelected={paymentModal.seats.map(s => s.id)}
           />
         )}
 

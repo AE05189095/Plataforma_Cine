@@ -9,4 +9,7 @@ router.post('/', auth, purchaseController.create);
 router.post('/showtimes/:showtimeId/lock-seats', auth, purchaseController.lockSeats);
 router.get('/user/:userId', auth, purchaseController.listByUser);
 
+// Cancelar compra
+router.patch('/:id/cancel', auth, purchaseController.cancel);
+
 module.exports = router;
