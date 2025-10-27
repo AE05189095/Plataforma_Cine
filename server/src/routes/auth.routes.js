@@ -2,6 +2,7 @@
 
 const express = require('express');
 const router = express.Router(); 
+const Log = require("../models/Log.js");
 
 // --- Importaciones de Controladores (Estructura Modular) ---
 const { loginController, registerController, loginAdmin, loginColab, meController, changePasswordController } = require('../controllers/authController');
@@ -22,6 +23,23 @@ router.get('/recover-password', verifyEmail);
 // --- Rutas Protegidas ---
 router.get("/me", authMiddleware, meController);
 router.post("/change-password", authMiddleware, changePasswordController);
+
+//ruta cerrar sesion
+router.post("/logout", async (req, res) => {
+  const { userId, role } = req.body;
+  if (!userId || !role) {
+    return res.status(400).json({ message: "Usuario no autenticado" });
+  }
+  try {
+    await Log.create({usuario: userId, role, accion: "cierre_sesion",
+      descripcion: `El usuario cerró sesión.`,
+    });
+    res.json({ message: "Sesión cerrada correctamente." });
+  } catch (error) {
+    console.error("Error al registrar cierre de sesión:", error);
+    res.json({ message: "Sesión cerrada correctamente, aunque el log falló." });
+  }
+});
 
 
 // Mantenemos la ruta /protegida original de presentation/final-demo
