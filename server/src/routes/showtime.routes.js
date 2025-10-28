@@ -1,9 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/showtimeController');
+const authMiddleware = require('./middleware/authMiddleware');
 
+// Rutas públicas
 router.get('/', controller.list);
 router.get('/:id', controller.get);
-router.post('/:id/reserve', controller.reserveSeats);
+
+// ADMIN CRUD (requiere autenticación y rol admin)
+router.post('/', authMiddleware, controller.create);
+router.patch('/:id', authMiddleware, controller.update);
+router.delete('/:id', authMiddleware, controller.remove);
+
+// Bloqueo y reserva de asientos (protegidos)
+router.post('/:id/lock-seats', authMiddleware, controller.lockSeats);
+router.post('/:id/reserve', authMiddleware, controller.reserveSeats);
 
 module.exports = router;

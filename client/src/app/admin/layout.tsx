@@ -1,0 +1,43 @@
+"use client";
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import Header from "@/components/Header";
+import ProtectedRoute from "@/components/Protectedroute";
+
+const tabs = [
+  { href: "/admin/dashboard", label: "Dashboard" },
+  { href: "/admin/peliculas", label: "Películas" },
+  { href: "/admin/horarios", label: "Horarios" },
+  { href: "/admin/salas", label: "Salas" },
+  { href: "/admin/reservas", label: "Reservas" },
+];
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  return (
+    <ProtectedRoute>
+      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+        <Header onLogoClick={() => { /* mantener comportamiento por defecto */ }} />
+
+        {/* Top tabs styled with project palette variables */}
+        <div className="max-w-[1280px] mx-auto px-4 py-4">
+          <nav className="flex items-center gap-3 rounded-full px-3 py-2" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(220,38,38,0.15)" }}>
+            {tabs.map((t) => {
+              const active = pathname === t.href;
+              return (
+                <Link key={t.href} href={t.href} className={`px-4 py-2 rounded-full text-sm font-medium transition ${active ? 'shadow-inner' : 'hover:bg-black/30'}`}
+                  style={active ? { background: 'linear-gradient(90deg, rgba(220,38,38,0.14), rgba(220,38,38,0.08))', color: 'var(--color-link)', border: '1px solid rgba(220,38,38,0.4)' } : { color: 'var(--foreground)' }}>
+                  {t.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <main className="max-w-[1280px] mx-auto px-4 pb-12">{children}</main>
+      </div>
+    </ProtectedRoute>
+  );
+}
