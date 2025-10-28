@@ -14,7 +14,7 @@ const logSchema = new mongoose.Schema({
   accion: {
     type: String,
     enum: [
-      "inicio_sesion", "cierre_sesion", "compra", "cancelacion", "modificacion",],
+      "inicio_sesion", "cierre_sesion", "compra", "cancelacion", "modificacion","creacion","eliminacion",],
     required: true,
   },
   descripcion: {
