@@ -1,31 +1,28 @@
-/*const Reservation = require('../models/Reservation.js');
+const Reservation = require('../models/Reservation.js');
 
 exports.getReservations = async (req, res) => {
-  const { movie, date, user, estado } = req.query;
+  const { date, estado } = req.query;
   const filters = {};
 
-  if (movie) filters['showtimeId.movieId.title'] = movie;
-  if (date) filters['showtimeId.startTime'] = { $gte: new Date(date) };
-  if (user) filters['userId.email'] = user;
   if (estado) filters.estado = estado;
-  
+  if (date) filters.createdAt = { $gte: new Date(date) };
+
   const reservations = await Reservation.find(filters)
-      .populate('userId', 'email')
-      .populate({
-        path: 'showtimeId',
-        populate: [
-          { path: 'movieId', select: 'title' },
-          { path: 'hallId', select: 'name' }
-        ]
-      });
-      
-      res.json(reservations);
+    .populate('userId', 'email')
+    .populate({
+      path: 'showtimeId',
+      populate: [
+        { path: 'movie', select: 'title' },
+        { path: 'hall', select: 'name' }
+      ],
+      options: { strictPopulate: false }
+    });
 
-  
-      
+  res.json(reservations);
 };
-*/
 
+
+/*
 const Reservation = require('../models/Reservation.js');
 
 exports.getReservations = async (req, res) => {
@@ -51,3 +48,4 @@ exports.getReservationsRaw = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener reservas embebidas' });
   }
 };
+*/

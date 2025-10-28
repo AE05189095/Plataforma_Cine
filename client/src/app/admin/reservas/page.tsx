@@ -3,7 +3,6 @@ import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 
-import { Users, Calendar, DollarSign, Search, Download } from "lucide-react";
 import { API_BASE, TOKEN_KEY } from "../../../lib/config";
 
 
@@ -11,14 +10,15 @@ interface Reserva {
   _id: string;
   userId: { email: string };
   showtimeId: {
-    startTime: string;
-    movieId: { title: string };
-    hallId: { name: string };
+    startAt: string;
+    movie: { title: string };
+    hall: { name: string };
   };
   seats: string[];
   totalPrice: number;
   estado: string; // e.g., 'pendiente', 'confirmada', 'cancelada'
   createdAt: string;
+  test?: boolean; // 👈 campo opcional
 }
 
 interface Filtros {
@@ -65,10 +65,18 @@ export default function AdminReservasPage() {
     const rows = reservas.map((r) => [
       r._id,
       r.userId?.email ?? 'Sin correo',
-      r.showtimeId?.movieId?.title ?? 'Sin título',
+      r.showtimeId?.movie?.title ?? 'Sin título',
+      /*
       r.showtimeId?.startTime
         ? new Date(r.showtimeId.startTime).toLocaleDateString()
-        : 'Sin fecha',
+        : 'Sin fecha',*/
+        r.showtimeId?.startAt
+  ? new Date(r.showtimeId.startAt).toLocaleDateString('es-GT', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  : 'Sin fecha',
       r.seats?.join(', ') ?? 'Sin asientos',
       `Q${r.totalPrice ?? '?'}`,
       r.estado ?? '?',
@@ -95,32 +103,34 @@ export default function AdminReservasPage() {
   const fetchReservas = async () => {
     try {
       setLoading(true);
-      //const res = await fetch(`${API_BASE}/api/reservations`);
-      const res = await fetch(`${API_BASE}/api/reservations/raw`);
+      const res = await fetch(`${API_BASE}/api/reservations`);
+      //const res = await fetch(`${API_BASE}/api/reservations/raw`);
       if (!res.ok) throw new Error('No se pudo obtener reservas');
       const data: Reserva[] = await res.json();
 
+      const reales = data.filter(r => !r.test);
       // Aplicar filtros en el frontend
-      const filtradas = data.filter((r) => {
+      const filtradas = reales.filter((r) => {
         const coincideId =
           filtros.id === '' || r._id?.includes(filtros.id);
 
         const coincideUser =
           filtros.user === '' ||
-          r.userId?.email?.toLowerCase()?.includes(filtros.user.toLowerCase()) ||
+          (r.userId?.email && r.userId.email.toLowerCase().includes(filtros.user.toLowerCase())) ||
           r._id?.includes(filtros.user);
 
         const coincideMovie =
           filtros.movie === '' ||
-          r.showtimeId?.movieId?.title?.toLowerCase()?.includes(filtros.movie.toLowerCase());
+          (r.showtimeId?.movie?.title && r.showtimeId.movie.title.toLowerCase().includes(filtros.movie.toLowerCase()));
+
 
         const coincideEstado =
           filtros.estado === '' || r.estado === filtros.estado;
 
         const coincideFecha =
           filtros.date === '' ||
-          (r.showtimeId?.startTime &&
-            new Date(r.showtimeId.startTime).toISOString().split('T')[0] === filtros.date);
+          (r.showtimeId?.startAt &&
+            new Date(r.showtimeId.startAt).toISOString().split('T')[0] === filtros.date);
 
         return coincideId && coincideUser && coincideMovie && coincideEstado && coincideFecha;
       });
@@ -207,8 +217,8 @@ export default function AdminReservasPage() {
           <option value="">Todas las películas</option>
           {Array.from(new Set(
             reservas
-              .filter((r) => r.showtimeId?.movieId?.title)
-              .map((r) => r.showtimeId.movieId.title)
+              .filter((r) => r.showtimeId?.movie?.title)
+              .map((r) => r.showtimeId.movie.title)
           )).map((movie) => (
             <option key={movie} value={movie}>{movie}</option>
           ))}
@@ -237,26 +247,30 @@ export default function AdminReservasPage() {
           style={headerStyle}
         />
 
-        {(filtros.user || filtros.movie || filtros.estado || filtros.date) && (
+         <div className="flex gap-2 items-center">
+          {(filtros.user || filtros.movie || filtros.estado || filtros.date) ? (
+            <button
+              type="button"
+              onClick={() => setFiltros({ id: '', user: '', date: '', movie: '', estado: '' })}
+              className="border px-4 py-2 rounded text-white hover:bg-gray-700"
+              style={headerStyle}
+            >
+              Limpiar filtros
+            </button>
+          ) : (
+            <div className="border px-4 py-2 rounded invisible" style={headerStyle}>
+              Limpiar filtros
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={() => setFiltros({ id: '', user: '', date: '', movie: '', estado: '' })}
-            className="border px-4 py-2 rounded text-white hover:bg-gray-700"
+            className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-45"
+            style={headerStyle}
           >
-            Limpiar filtros
+            Exportar
           </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => exportarCSV(reservas)}
-          className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-80"
-          style={headerStyle}
-        >
-          Exportar
-        </button>
-
-
+        </div>
 
       </form>
 
@@ -288,10 +302,10 @@ export default function AdminReservasPage() {
                   <tr key={r._id} className="bg-gray-800 border-b border-gray-700 text-white">
                     <td className="px-4 py-2">{r._id}</td>
                     <td className="px-4 py-2">{r.userId?.email ?? "Sin correo"}</td>
-                    <td className="px-4 py-2">{r.showtimeId?.movieId?.title ?? "Sin título"}</td>
+                    <td className="px-4 py-2">{r.showtimeId?.movie?.title ?? "Sin título"}</td>
                     <td className="px-4 py-2">
-                      {r.showtimeId?.startTime
-                        ? new Date(r.showtimeId.startTime).toLocaleDateString()
+                      {r.showtimeId?.startAt
+                        ? new Date(r.showtimeId.startAt).toLocaleDateString()
                         : "Sin fecha"}
                     </td>
                     <td className="px-4 py-2">

@@ -6,6 +6,8 @@ const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 const Stripe = require('stripe');
 const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const Reservation = require('../models/Reservation');
+
 
 // ==========================================================
 // LOCK DE ASIENTOS
@@ -173,6 +175,17 @@ exports.create = async (req, res) => {
       confirmationCode,
       emailSent: false,
     }], { session });
+
+    const Reservation = require('../models/Reservation');
+
+    await Reservation.create([{
+      userId,
+      showtimeId,
+      seats,
+      totalPrice: totalQ,
+      estado: 'confirmada',
+    }], { session });
+
 
     await session.commitTransaction();
 
