@@ -294,6 +294,18 @@ exports.cancel = async (req, res) => {
     purchase.status = "cancelled";
     await purchase.save();
 
+    //log al cancelar compra
+    try {
+      await Log.create({
+        usuario: userId,
+        role: req.user.role || "cliente", 
+        accion: "cancelacion", 
+        descripcion: `El usuario canceló su compra con ID: ${purchase._id}`,
+      });
+    } catch (logError) {
+      console.error("Error al crear log de cancelación:", logError);
+    }
+
     // Emitir evento para liberar asientos
     try {
       const io = req.app.get('io');
