@@ -1,0 +1,6 @@
+.env
+node_modules/
+.env.local
+
+# Admin credentials for local testing (should not be committed)
+admins_test.json

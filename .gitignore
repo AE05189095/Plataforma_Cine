@@ -1,0 +1,16 @@
+
+/node_modules
+/client/node_modules
+/server/node_modules
+
+
+/client/.next
+/client/out
+
+
+.env
+/client/.env.local
+/server/.env
+
+
+*.log

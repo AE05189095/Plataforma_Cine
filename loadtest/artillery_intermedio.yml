@@ -1,0 +1,39 @@
+config:
+  target: "{{ $processEnvironment.BASE_URL || 'http://localhost:4000' }}"
+  phases:
+    - duration: 60   # 1m warm-up
+      arrivalRate: 20
+      name: warmup
+    - duration: 120  # 2m rampa
+      arrivalRate: 60
+      name: ramp
+    - duration: 180  # 3m rampa a pico
+      arrivalRate: 100
+      name: near-peak
+    - duration: 300  # 5m sostener
+      arrivalRate: 120
+      name: sustain
+  defaults:
+    headers:
+      Origin: "{{ $processEnvironment.FRONTEND || 'http://localhost:3000' }}"
+  plugins:
+    metrics-by-endpoint: {}
+
+scenarios:
+  - name: Navegación mezcla
+    weight: 3
+    flow:
+      - get:
+          url: "/api/movies"
+      - think: 1
+      - get:
+          url: "/api/showtimes"
+
+  - name: Navegación showtimes pesado
+    weight: 2
+    flow:
+      - get:
+          url: "/api/showtimes"
+      - think: 1
+      - get:
+          url: "/api/showtimes"
