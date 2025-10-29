@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 
 import { API_BASE, TOKEN_KEY } from "../../../lib/config";
-
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 interface Reserva {
   _id: string;
@@ -51,14 +52,43 @@ export default function AdminReservasPage() {
   }, []);
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFiltros((prev) => ({ ...prev, [name]: value }));
+    setFiltros((prev) => {
+      const nuevosFiltros = { ...prev, [name]: value };
+      fetchReservas(nuevosFiltros); // 👈 pasa los filtros actualizados
+      return nuevosFiltros;
+    });
   };
+
+// Estado para películas disponibles en el filtro
+const [peliculasDisponibles, setPeliculasDisponibles] = useState<string[]>([]);
+
+// Cargar películas al montar el componente
+  useEffect(() => {
+  const fetchPeliculas = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/movies`);
+      if (!res.ok) throw new Error('No se pudo obtener películas');
+      const data = await res.json();
+
+      const activas = data.filter((p: any) => p.isActive); // si usás isActive
+      const titulos = activas.map((p: any) => p.title);
+      setPeliculasDisponibles(titulos);
+    } catch (error) {
+      console.error('Error al cargar películas:', error);
+      setPeliculasDisponibles([]);
+    }
+  };
+
+  fetchPeliculas();
+}, []);
+
 
   const handleFilter = (e: FormEvent) => {
     e.preventDefault();
     fetchReservas();
   };
 
+  /*
   const exportarCSV = (reservas: Reserva[]) => {
     const headers = ['ID', 'Cliente', 'Película', 'Función', 'Asientos', 'Total', 'Estado', 'Fecha Reserva'];
 
@@ -66,17 +96,13 @@ export default function AdminReservasPage() {
       r._id,
       r.userId?.email ?? 'Sin correo',
       r.showtimeId?.movie?.title ?? 'Sin título',
-      /*
-      r.showtimeId?.startTime
-        ? new Date(r.showtimeId.startTime).toLocaleDateString()
-        : 'Sin fecha',*/
-        r.showtimeId?.startAt
-  ? new Date(r.showtimeId.startAt).toLocaleDateString('es-GT', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
-  : 'Sin fecha',
+      r.showtimeId?.startAt
+        ? new Date(r.showtimeId.startAt).toLocaleDateString('es-GT', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        })
+        : 'Sin fecha',
       r.seats?.join(', ') ?? 'Sin asientos',
       `Q${r.totalPrice ?? '?'}`,
       r.estado ?? '?',
@@ -98,43 +124,90 @@ export default function AdminReservasPage() {
     document.body.removeChild(link);
   };
 
+*/
 
 
-  const fetchReservas = async () => {
+const exportarExcel = (reservas: Reserva[]) => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Reservas');
+
+  // Estilo del encabezado
+  worksheet.columns = [
+    { header: 'ID', key: 'id', width: 20 },
+    { header: 'Cliente', key: 'cliente', width: 25 },
+    { header: 'Película', key: 'pelicula', width: 25 },
+    { header: 'Función', key: 'funcion', width: 20 },
+    { header: 'Asientos', key: 'asientos', width: 30 },
+    { header: 'Total', key: 'total', width: 15 },
+    { header: 'Estado', key: 'estado', width: 15 },
+    { header: 'Fecha Reserva', key: 'fecha', width: 20 },
+  ];
+
+  worksheet.getRow(1).eachCell((cell) => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E3A5F' }, // azul oscuro
+    };
+    cell.font = {
+      color: { argb: 'FFFFFFFF' }, // blanco
+      bold: true,
+    };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+
+  // Agregar filas
+  reservas.forEach((r) => {
+    worksheet.addRow({
+      id: r._id,
+      cliente: r.userId?.email ?? 'Sin correo',
+      pelicula: r.showtimeId?.movie?.title ?? 'Sin título',
+      funcion: r.showtimeId?.startAt
+        ? new Date(r.showtimeId.startAt).toLocaleDateString('es-GT', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : 'Sin fecha',
+      asientos: r.seats?.join(', ') ?? 'Sin asientos',
+      total: `Q${r.totalPrice ?? '?'}`,
+      estado: r.estado ?? '?',
+      fecha: r.createdAt
+        ? new Date(r.createdAt).toLocaleDateString()
+        : 'Sin fecha',
+    });
+  });
+
+  // Exportar
+  workbook.xlsx.writeBuffer().then((buffer) => {
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    saveAs(blob, 'reservas.xlsx');
+  });
+};
+
+
+  const fetchReservas = async (filtrosActivos: Filtros = filtros) => {
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE}/api/reservations`);
-      //const res = await fetch(`${API_BASE}/api/reservations/raw`);
       if (!res.ok) throw new Error('No se pudo obtener reservas');
       const data: Reserva[] = await res.json();
 
-      const reales = data.filter(r => !r.test);
-      // Aplicar filtros en el frontend
-      const filtradas = reales.filter((r) => {
-        const coincideId =
-          filtros.id === '' || r._id?.includes(filtros.id);
+      const filtradas = data.filter((r) => {
+        const coincideId = filtrosActivos.id === '' || r._id?.includes(filtrosActivos.id);
+        const coincideUser = filtrosActivos.user === '' || r.userId?.email?.toLowerCase().includes(filtrosActivos.user.toLowerCase());
+        const coincideMovie = filtrosActivos.movie === '' || r.showtimeId?.movie?.title?.toLowerCase().includes(filtrosActivos.movie.toLowerCase());
+        const coincideEstado = filtrosActivos.estado === '' || r.estado === filtrosActivos.estado;
+        const coincideFecha = filtrosActivos.date === '' || (
+          r.showtimeId?.startAt &&
+          new Date(r.showtimeId.startAt).toISOString().split('T')[0] === filtrosActivos.date
+        );
+        const noEsTest = !r.test; // Excluir reservas de prueba
 
-        const coincideUser =
-          filtros.user === '' ||
-          (r.userId?.email && r.userId.email.toLowerCase().includes(filtros.user.toLowerCase())) ||
-          r._id?.includes(filtros.user);
-
-        const coincideMovie =
-          filtros.movie === '' ||
-          (r.showtimeId?.movie?.title && r.showtimeId.movie.title.toLowerCase().includes(filtros.movie.toLowerCase()));
-
-
-        const coincideEstado =
-          filtros.estado === '' || r.estado === filtros.estado;
-
-        const coincideFecha =
-          filtros.date === '' ||
-          (r.showtimeId?.startAt &&
-            new Date(r.showtimeId.startAt).toISOString().split('T')[0] === filtros.date);
-
-        return coincideId && coincideUser && coincideMovie && coincideEstado && coincideFecha;
+        return coincideId && coincideUser && coincideMovie && coincideEstado && coincideFecha && noEsTest;
       });
-
 
       setReservas(filtradas);
     } catch (error) {
@@ -143,8 +216,20 @@ export default function AdminReservasPage() {
     } finally {
       setLoading(false);
     }
+  };
 
 
+
+  const handleClearFilters = () => {
+    const filtrosVacios = {
+      id: '',
+      user: '',
+      date: '',
+      movie: '',
+      estado: '',
+    };
+    setFiltros(filtrosVacios);
+    fetchReservas(filtrosVacios); // 👈 recarga sin filtros
   };
 
 
@@ -215,13 +300,11 @@ export default function AdminReservasPage() {
           style={headerStyle}
         >
           <option value="">Todas las películas</option>
-          {Array.from(new Set(
-            reservas
-              .filter((r) => r.showtimeId?.movie?.title)
-              .map((r) => r.showtimeId.movie.title)
-          )).map((movie) => (
-            <option key={movie} value={movie}>{movie}</option>
-          ))}
+          {peliculasDisponibles.map((titulo) => (
+    <option key={titulo} value={titulo}>
+      {titulo}
+    </option>
+  ))}
 
         </select>
 
@@ -247,11 +330,13 @@ export default function AdminReservasPage() {
           style={headerStyle}
         />
 
-         <div className="flex gap-2 items-center">
+
+        <div className="flex gap-2 items-center">
           {(filtros.user || filtros.movie || filtros.estado || filtros.date) ? (
+
             <button
               type="button"
-              onClick={() => setFiltros({ id: '', user: '', date: '', movie: '', estado: '' })}
+              onClick={handleClearFilters}
               className="border px-4 py-2 rounded text-white hover:bg-gray-700"
               style={headerStyle}
             >
@@ -261,16 +346,21 @@ export default function AdminReservasPage() {
             <div className="border px-4 py-2 rounded invisible" style={headerStyle}>
               Limpiar filtros
             </div>
-          )}
 
-          <button
-            type="button"
-            className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-45"
-            style={headerStyle}
-          >
-            Exportar
-          </button>
+
+          )}
+        {/*agregar onClick a exportarExcel*/}
+        <button
+          type="button"
+          onClick={() => exportarExcel(reservas)}
+          className="border px-4 py-2 rounded text-white hover:bg-gray-700 ml-45"
+          style={headerStyle}
+        >
+          Exportar
+        </button> 
         </div>
+
+       
 
       </form>
 
