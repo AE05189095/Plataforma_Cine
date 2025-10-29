@@ -7,6 +7,9 @@ const Movie = require('../models/Movie'); // necesario para showtimes simulados
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 const Stripe = require('stripe');
 const stripe = process.env.STRIPE_SECRET_KEY ? Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const Reservation = require('../models/Reservation');
+
+
 
 // ==========================================================
 // LOCK DE ASIENTOS
@@ -175,19 +178,30 @@ exports.create = async (req, res) => {
       emailSent: false,
     }], { session });
 
-//log de compra
-try {
-  await Log.create({
-    usuario: userId,
-    role: req.user?.role || 'cliente',
-    accion: 'compra',
-    descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
-  });
-} catch (logErr) {
-  console.error('Error registrando log de compra:', logErr);
-}
+    // Log de compra
+    try {
+      await Log.create([{
+        usuario: userId,
+        role: req.user?.role || 'cliente',
+        accion: 'compra',
+        descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
+      }], { session });
+    } catch (logErr) {
+      console.error('Error registrando log de compra:', logErr);
+    }
+
+    // Crear la reserva en la colección de Reservas
+    await Reservation.create([{
+      userId,
+      showtimeId,
+      seats,
+      totalPrice: totalQ,
+      estado: 'confirmada',
+    }], { session });
 
     await session.commitTransaction();
+
+
 
     // Emitir eventos de socket
     try {
@@ -298,13 +312,25 @@ exports.cancel = async (req, res) => {
     try {
       await Log.create({
         usuario: userId,
-        role: req.user.role || "cliente", 
-        accion: "cancelacion", 
+        role: req.user.role || "cliente",
+        accion: "cancelacion",
         descripcion: `El usuario canceló su compra con ID: ${purchase._id}`,
       });
     } catch (logError) {
       console.error("Error al crear log de cancelación:", logError);
     }
+    // Actualizar estado de la reserva asociada
+    try {
+      await Reservation.findOneAndUpdate(
+        // Usar los datos de la compra para una búsqueda precisa
+        { userId: purchase.user, showtimeId: purchase.showtime, seats: { $all: purchase.seats } },
+        { $set: { estado: 'cancelada' } }
+      );
+    } catch (updateError) {
+      console.error("Error al actualizar estado de reserva:", updateError);
+    }
+
+
 
     // Emitir evento para liberar asientos
     try {
@@ -332,6 +358,3 @@ exports.cancel = async (req, res) => {
     res.status(500).json({ message: err.message || 'Error interno al cancelar compra' });
   }
 };
-
-
-
