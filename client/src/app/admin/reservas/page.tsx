@@ -17,7 +17,7 @@ interface Reserva {
   };
   seats: string[];
   totalPrice: number;
-  estado: string; // e.g., 'pendiente', 'confirmada', 'cancelada'
+  estado: string; // e.g. 'confirmada', 'cancelada'
   createdAt: string;
   test?: boolean; // 👈 campo opcional
 }
@@ -87,44 +87,6 @@ const [peliculasDisponibles, setPeliculasDisponibles] = useState<string[]>([]);
     e.preventDefault();
     fetchReservas();
   };
-
-  /*
-  const exportarCSV = (reservas: Reserva[]) => {
-    const headers = ['ID', 'Cliente', 'Película', 'Función', 'Asientos', 'Total', 'Estado', 'Fecha Reserva'];
-
-    const rows = reservas.map((r) => [
-      r._id,
-      r.userId?.email ?? 'Sin correo',
-      r.showtimeId?.movie?.title ?? 'Sin título',
-      r.showtimeId?.startAt
-        ? new Date(r.showtimeId.startAt).toLocaleDateString('es-GT', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        })
-        : 'Sin fecha',
-      r.seats?.join(', ') ?? 'Sin asientos',
-      `Q${r.totalPrice ?? '?'}`,
-      r.estado ?? '?',
-      r.createdAt
-        ? new Date(r.createdAt).toLocaleDateString()
-        : 'Sin fecha',
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers, ...rows].map((e) => e.join(',')).join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'reservas.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-*/
 
 
 const exportarExcel = (reservas: Reserva[]) => {
@@ -263,7 +225,7 @@ const exportarExcel = (reservas: Reserva[]) => {
 
         <div className="p-4 rounded-lg shadow min-h-[150px]" style={headerStyle}>
           <div className="flex justify-between items-center pb-2">
-            <p className="text-white font-medium">Pendientes</p>
+            <p className="text-white font-medium">Canceladas</p>
           </div>
           <div className="text-2xl font-bold text-yellow-600">
             {reservas.filter((r) => r.estado === 'pendiente').length}
@@ -317,7 +279,6 @@ const exportarExcel = (reservas: Reserva[]) => {
         >
           <option value="">Todos los estados</option>
           <option value="confirmada">Confirmada</option>
-          <option value="pendiente">Pendiente</option>
           <option value="cancelada">Cancelada</option>
         </select>
 
