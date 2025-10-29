@@ -1,9 +1,12 @@
 {
   "dependencies": {
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
     "@stripe/react-stripe-js": "^5.2.0",
     "@stripe/stripe-js": "^8.1.0",
-    "nodemailer": "^7.0.9"
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "nodemailer": "^7.0.9",
+    "xlsx": "^0.18.5"
   }
 }
