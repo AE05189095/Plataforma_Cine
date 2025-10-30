@@ -343,7 +343,7 @@ export default function AdminReservasPage() {
         {loading ? (
           <p className="text-gray-400 italic">Cargando reservas...</p>
         ) : reservas.length > 0 ? (
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-hide">
             <table className="w-full text-sm text-left border-collapse" >
               <thead className="sticky top-0 z-10" >
                 <tr className="bg-gray-700 text-white" style={boxStyle}>
