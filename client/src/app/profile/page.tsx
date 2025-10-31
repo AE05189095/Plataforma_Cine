@@ -52,10 +52,34 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) {
+    router.push("/");
+    return;
+  }
+  try {
+    // Decodificar payload del JWT
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const userId = payload.userId;
+    const role = payload.role;
+    // Registrar logout en el backend
+    const res = await fetch(`${API_BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, role }),
+    });
+    const data = await res.json();
+    console.log("Logout registrado:", data.message);
+  } catch (error) {
+    console.error("Error registrando logout:", error);
+  } finally {
+    // Eliminar token local y redirigir siempre
     localStorage.removeItem(TOKEN_KEY);
-    router.push('/');
-  };
+    router.push("/");
+  }
+};
+
 
   const submitChange = async () => {
     setChanging(true);
@@ -65,7 +89,7 @@ export default function ProfilePage() {
       const res = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        body: JSON.stringify({ oldPassword: currentPassword, newPassword }),
       });
 
       const body = await res.json();
