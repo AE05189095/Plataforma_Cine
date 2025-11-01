@@ -4,6 +4,7 @@ const Purchase = require('../models/Purchase');
 const Showtime = require('../models/Showtime');
 const Log = require("../models/Log");
 const Movie = require('../models/Movie'); // necesario para showtimes simulados
+const Reservation = require('../models/Reservation');
 const SeatLock = require('../models/SeatLock');
 const { sendConfirmationEmail } = require('../utils/sendEmail');
 const Stripe = require('stripe');
@@ -237,18 +238,27 @@ exports.create = async (req, res) => {
       // No abortamos la transacción completa por un fallo en guardar seatlocks,
       // pero lo registramos para investigarlo.
     }
+    
+    // Log de compra
+    try {
+      await Log.create([{
+        usuario: userId,
+        role: req.user?.role || 'cliente',
+        accion: 'compra',
+        descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
+      }], { session });
+    } catch (logErr) {
+      console.error('Error registrando log de compra:', logErr);
+    }
 
-//log de compra
-try {
-  await Log.create({
-    usuario: userId,
-    role: req.user?.role || 'cliente',
-    accion: 'compra',
-    descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
-  });
-} catch (logErr) {
-  console.error('Error registrando log de compra:', logErr);
-}
+    // Crear la reserva en la colección de Reservas
+    await Reservation.create([{
+      userId,
+      showtimeId: showtimeId,
+      seats,
+      totalPrice: totalQ,
+      estado: 'confirmada',
+    }], { session });
 
     await session.commitTransaction();
 
@@ -358,9 +368,19 @@ exports.cancel = async (req, res) => {
     purchase.status = "cancelled";
     await purchase.save();
 
+    // Actualizar el estado de la reserva correspondiente a 'cancelada'
+    try {
+      await Reservation.findOneAndUpdate(
+        { userId: purchase.user, showtimeId: purchase.showtime, estado: 'confirmada' },
+        { $set: { estado: 'cancelada' } }
+      );
+    } catch (reservationError) {
+      console.error('Error al actualizar el estado de la reserva:', reservationError);
+    }
+
     // Eliminar SeatLock asociados a esta compra (liberar registro en collection SeatLock)
     try {
-      await SeatLock.deleteMany({ showtimeId: purchase.showtime, seatId: { $in: purchase.seats } });
+      await SeatLock.deleteMany({ showtime: purchase.showtime, seatId: { $in: purchase.seats } });
     } catch (delErr) {
       console.error('Error eliminando SeatLock al cancelar compra:', delErr);
     }
@@ -368,8 +388,8 @@ exports.cancel = async (req, res) => {
     try {
       await Log.create({
         usuario: userId,
-        role: req.user.role || "cliente", 
-        accion: "cancelacion", 
+        role: req.user.role || "cliente",
+        accion: "cancelacion",
         descripcion: `El usuario canceló su compra con ID: ${purchase._id}`,
       });
     } catch (logError) {
@@ -403,6 +423,3 @@ exports.cancel = async (req, res) => {
     res.status(500).json({ message: err.message || 'Error interno al cancelar compra' });
   }
 };
-
-
-

@@ -34,28 +34,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Form controls y componentes oscuros */
-select, input, textarea, button {
-  background-color: rgba(11,18,32,0.92);
-  color: var(--foreground);
-  border: 1px solid rgba(255,255,255,0.06);
-}
-
-/* Intento de forzar paleta oscura en los desplegables nativos */
-select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  padding: 0.5rem 1rem;
-  background-image: none;
-}
-
-/* Opciones del select (algunas plataformas respetan este estilo) */
-select option {
-  background-color: #0b1220;
-  color: var(--foreground);
-}
-
 /* Forzar cajas/modales y tarjetas a paleta oscura */
 .card, .panel, .modal, .dialog, .toast, .center-card {
   background: rgba(6,8,12,0.75);
@@ -63,16 +41,16 @@ select option {
   border: 1px solid rgba(255,255,255,0.04);
 }
 
-/* Botón primary naranja consistente */
-.btn-primary, button.primary {
-  background: var(--color-primary);
-  color: #0b1220;
-  border: none;
+/* Forzar íconos de date/time a ser blancos en fondos oscuros */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
-/* Pequeños toques para inputs y selects en focus */
-select:focus, input:focus, textarea:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
-  border-color: rgba(249,115,22,0.9);
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE y Edge */
 }

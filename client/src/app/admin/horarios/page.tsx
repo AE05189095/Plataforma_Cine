@@ -49,7 +49,7 @@ export default function AdminHorariosPage() {
       // console.log('Socket conectado (horarios):', socket.id);
     });
 
-    socket.on('showtimeCreated', (st: any) => {
+    socket.on('showtimeCreated', (st: Showtime) => {
       setShowtimes(prev => {
         // evitar duplicados
         if (!st || !st._id) return prev;
@@ -58,11 +58,11 @@ export default function AdminHorariosPage() {
       });
     });
 
-    socket.on('showtimeUpdated', (st: any) => {
+    socket.on('showtimeUpdated', (st: Showtime) => {
       setShowtimes(prev => prev.map(x => x._id === st._id ? st : x));
     });
 
-    socket.on('showtimeRemoved', (payload: any) => {
+    socket.on('showtimeRemoved', (payload: { id?: string; _id?: string }) => {
       const id = payload && (payload.id || payload._id) ? (payload.id || payload._id) : null;
       if (!id) return;
       setShowtimes(prev => prev.filter(x => x._id !== id));
@@ -91,10 +91,10 @@ export default function AdminHorariosPage() {
     try {
       const preHall = searchParams ? searchParams.get('hall') : null;
       if (preHall) setForm(prev => ({ ...prev, hall: preHall }));
-    } catch (e) {
+    } catch (err) {
       // ignore
     }
-  }, [loadAll]);
+  }, [loadAll, searchParams]);
 
   
 
@@ -161,7 +161,7 @@ export default function AdminHorariosPage() {
 
       // comprobar showtimes existentes en el mismo hall
       const others = showtimes.filter(st => {
-        const stHall = typeof st.hall === 'string' ? st.hall : (st.hall && (st.hall as any)._id ? (st.hall as any)._id : null);
+        const stHall = typeof st.hall === 'string' ? st.hall : st.hall?._id;
         if (!stHall) return false;
         if (stHall !== form.hall) return false;
         if (!st.isActive) return false;
@@ -178,7 +178,7 @@ export default function AdminHorariosPage() {
         let sEnd: Date | null = null;
         if (st.endAt) sEnd = new Date(st.endAt);
         else {
-          const stMovie = typeof st.movie === 'string' ? movies.find(m => m._id === st.movie) : (st.movie as any);
+          const stMovie = typeof st.movie === 'string' ? movies.find(m => m._id === st.movie) : st.movie;
           const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stMovie.duration : DEFAULT_DURATION_MIN;
           sEnd = new Date(sStart.getTime() + stDur * 60000);
         }
@@ -250,7 +250,7 @@ export default function AdminHorariosPage() {
     <div className="py-8">
       <div className="flex items-center justify-between mb-6 p-4 rounded-lg" style={boxStyle}>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Gestión de Horarios</h1>
-        <button onClick={openCreate} className="px-4 py-2 rounded-lg" style={{ background: 'var(--color-primary)', color: '#fff' }}>+ Agregar Función</button>
+        <button onClick={openCreate} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors font-semibold shadow-lg">+ Agregar Función</button>
       </div>
 
       {error && (
@@ -303,40 +303,39 @@ export default function AdminHorariosPage() {
 
       {/* Modal simple */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setModalOpen(false)} />
-          <form onSubmit={handleSubmit} className="relative z-10 w-full max-w-lg p-6 rounded" style={{ background: 'var(--background)', color: 'var(--foreground)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <form onSubmit={handleSubmit} className="w-full max-w-lg p-6 rounded-lg bg-black text-white border border-gray-700">
             <h2 className="text-xl font-semibold mb-4">{editing ? 'Editar Función' : 'Agregar Función'}</h2>
 
             <label className="block mb-2">
-              <div className="text-sm mb-1">Película</div>
+              <div className="text-sm mb-1 text-gray-400">Película</div>
               <DarkSelect value={form.movie} onChange={(v) => setForm({ ...form, movie: v })} options={[{ value: '', label: '- Selecciona -' }, ...movies.map(m => ({ value: m._id, label: m.title }))]} />
             </label>
 
             <label className="block mb-2">
-              <div className="text-sm mb-1">Sala</div>
+              <div className="text-sm mb-1 text-gray-400">Sala</div>
               <DarkSelect value={form.hall} onChange={(v) => setForm({ ...form, hall: v })} options={[{ value: '', label: '- Selecciona -' }, ...halls.map(h => ({ value: h._id, label: h.name || h._id }))]} />
             </label>
 
-            <div className="flex gap-2">
+            <div className="flex gap-4">
               <label className="flex-1">
-                <div className="text-sm mb-1">Fecha</div>
-                <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full p-2 rounded" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--foreground)' }} />
+                <div className="text-sm mb-1 text-gray-400">Fecha</div>
+                <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
               <label className="flex-1">
-                <div className="text-sm mb-1">Hora</div>
-                <input type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="w-full p-2 rounded" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--foreground)' }} />
+                <div className="text-sm mb-1 text-gray-400">Hora</div>
+                <input type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
             </div>
 
             <label className="block mt-3">
-              <div className="text-sm mb-1">Precio</div>
-              <input type="number" min={0} value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="w-40 p-2 rounded" style={{ background: 'rgba(255,255,255,0.02)', color: 'var(--foreground)' }} />
+              <div className="text-sm mb-1 text-gray-400">Precio</div>
+              <input type="number" min={0} value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="w-40 p-2 rounded bg-gray-800 text-white border border-gray-600" />
             </label>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded" style={{ background: 'transparent', color: 'var(--foreground)', border: '1px solid rgba(255,255,255,0.06)' }}>Cancelar</button>
-              <button type="submit" className="px-4 py-2 rounded" style={{ background: 'var(--color-primary)', color: '#fff' }}>{editing ? 'Guardar' : 'Crear'}</button>
+              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Cancelar</button>
+              <button type="submit" className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white">{editing ? 'Guardar' : 'Crear'}</button>
             </div>
           </form>
         </div>
