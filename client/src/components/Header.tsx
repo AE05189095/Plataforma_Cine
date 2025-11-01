@@ -193,6 +193,7 @@ export default function Header(props: HeaderProps = {}) {
                             type="date"
                             placeholder="mm/dd/yyyy"
                             className="px-3 py-2 rounded-lg border border-red-600 bg-gray-800 text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 cursor-pointer flex-shrink-0 w-full md:w-auto"
+                            style={{ colorScheme: 'dark' }}
                             readOnly={false}
                             value={selectedDate}
                             onChange={(e) => setSelectedDate && setSelectedDate(e.target.value)}
