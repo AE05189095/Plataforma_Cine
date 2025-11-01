@@ -18,12 +18,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <ProtectedRoute>
-      <div style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)" }}>
+      <div className="min-h-screen bg-black text-white">
         <Header onLogoClick={() => { /* mantener comportamiento por defecto */ }} />
 
         {/* Top tabs styled with project palette variables */}
-        <div className="max-w-[1280px] mx-auto px-4 py-4">
-          <nav className="flex items-center gap-3 rounded-full px-3 py-2" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(220,38,38,0.15)" }}>
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <nav className="flex items-center justify-between w-full rounded-full px-3 py-2" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid #DC2626" }}>
             {tabs.map((t) => {
               const active = pathname === t.href;
               return (

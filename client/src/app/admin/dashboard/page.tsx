@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { API_BASE } from "../../../lib/config";
 
 type Movie = { _id: string; title: string; posterUrl?: string; images?: string[]; rating?: number; ratingCount?: number; isActive?: boolean };
@@ -49,7 +50,7 @@ export default function AdminDashboardPage() {
   for (const s of showtimes) {
     if (!s.isActive) continue;
     const booked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-    const cap = typeof s.capacity === 'number' && s.capacity > 0 ? s.capacity : (typeof (s as any).hall === 'object' && (s as any).hall && (s as any).hall.capacity ? (s as any).hall.capacity : 64);
+    const cap = typeof s.capacity === 'number' && s.capacity > 0 ? s.capacity : (typeof s.hall === 'object' && s.hall && s.hall.capacity ? s.hall.capacity : 64);
     totalBooked += booked;
     totalCapacity += cap;
     estimatedIncome += (s.price || 0) * booked;
@@ -60,21 +61,6 @@ export default function AdminDashboardPage() {
   // popular movies by rating (desc)
   const popularByRating = [...movies].filter(m => m).sort((a,b) => (b.rating || 0) - (a.rating || 0)).slice(0,3);
 
-  // state per hall
-  const hallsState = halls.map(h => {
-    const hallShowtimes = showtimes.filter(s => {
-      const hid = typeof s.hall === 'string' ? s.hall : (s.hall as any)?._id;
-      return hid === h._id && s.isActive !== false;
-    });
-    let booked = 0, capsum = 0;
-    for (const s of hallShowtimes) {
-      booked += Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-      capsum += typeof s.capacity === 'number' && s.capacity > 0 ? s.capacity : (h.capacity || 64);
-    }
-    const occ = capsum > 0 ? Math.round((booked / capsum) * 100) : 0;
-    return { hall: h, functions: hallShowtimes.length, occupancy: occ };
-  });
-
   // upcoming showtimes (por horario) - los próximos 8
   const upcomingShowtimes = [...showtimes]
     .filter(s => s.isActive !== false)
@@ -82,7 +68,7 @@ export default function AdminDashboardPage() {
     .slice(0, 8)
     .map(s => {
       const booked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-      const cap = typeof s.capacity === 'number' && s.capacity > 0 ? s.capacity : (s.hall && (s.hall as any).capacity ? (s.hall as any).capacity : 64);
+      const cap = typeof s.capacity === 'number' && s.capacity > 0 ? s.capacity : (typeof s.hall === 'object' && s.hall && s.hall.capacity ? s.hall.capacity : 64);
       const occ = cap > 0 ? Math.round((booked / cap) * 100) : 0;
       return { showtime: s, booked, capacity: cap, occupancy: occ };
     });
@@ -124,7 +110,7 @@ export default function AdminDashboardPage() {
                 return (
                   <li key={m._id} className="flex items-center space-x-3">
                     <div className="w-14 h-20 flex-shrink-0 bg-gray-800 rounded overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                      <img src={src} alt={m.title} className="w-full h-full object-cover" />
+                      <Image src={src} alt={m.title} className="w-full h-full object-cover" width={56} height={80} />
                     </div>
                     <div>
                       <div className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>{idx+1}. {m.title}</div>
@@ -146,8 +132,8 @@ export default function AdminDashboardPage() {
           ) : (
             <div className="space-y-3">
               {upcomingShowtimes.map(({ showtime, booked, capacity, occupancy }) => {
-                const movie = typeof showtime.movie === 'string' ? null : (showtime.movie as any);
-                const hall = typeof showtime.hall === 'string' ? null : (showtime.hall as any);
+                const movie = typeof showtime.movie === 'string' ? null : showtime.movie;
+                const hall = typeof showtime.hall === 'string' ? null : showtime.hall;
                 const dt = new Date(showtime.startAt);
                 const timeStr = dt.toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
                 return (

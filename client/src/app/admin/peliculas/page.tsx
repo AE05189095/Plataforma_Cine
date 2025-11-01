@@ -140,7 +140,7 @@ export default function AdminPeliculasPage() {
     <div className="py-8">
       <div className="flex items-center justify-between mb-6 p-4 rounded-lg" style={headerStyle}>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Gestión de Películas</h1>
-        <button onClick={openCreate} className="px-4 py-2 rounded-lg" style={{ background: 'var(--color-primary)', color: '#fff' }}>+ Agregar Película</button>
+        <button onClick={openCreate} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors font-semibold shadow-lg">+ Agregar Película</button>
       </div>
 
       {loading && <p style={{ color: 'var(--foreground)' }}>Cargando películas...</p>}
@@ -176,64 +176,64 @@ export default function AdminPeliculasPage() {
       {/* Modal editor simple */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-2xl bg-gray-900 rounded-lg p-6">
+          <div className="w-full max-w-2xl rounded-lg p-6 bg-black text-white border border-gray-700">
             <h2 className="text-xl font-bold mb-4">Editar película</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Título</span>
-                <input value={editing.title || ''} onChange={e => handleChange('title', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Título</span>
+                <input value={editing.title || ''} onChange={e => handleChange('title', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Slug</span>
-                <input value={editing.slug || ''} onChange={e => handleChange('slug', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Slug</span>
+                <input value={editing.slug || ''} onChange={e => handleChange('slug', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col col-span-2">
-                <span className="text-sm text-gray-300">Descripción</span>
-                <textarea value={editing.description || ''} onChange={e => handleChange('description', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded h-24" />
+                <span className="text-sm text-gray-400">Descripción</span>
+                <textarea value={editing.description || ''} onChange={e => handleChange('description', e.target.value)} className="mt-1 p-2 rounded h-24 bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Géneros (coma separada)</span>
-                <input value={(editing.genres || []).join(', ')} onChange={e => handleChange('genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Géneros (coma separada)</span>
+                <input value={(editing.genres || []).join(', ')} onChange={e => handleChange('genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Duración (min)</span>
-                <input type="number" value={editing.duration || ''} onChange={e => handleChange('duration', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Duración (min)</span>
+                <input type="number" value={editing.duration || ''} onChange={e => handleChange('duration', Number(e.target.value))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Director</span>
-                <input value={editing.director || ''} onChange={e => handleChange('director', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Director</span>
+                <input value={editing.director || ''} onChange={e => handleChange('director', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col col-span-2">
-                <span className="text-sm text-gray-300">URL de la portada (posterUrl)</span>
-                <input value={editing.posterUrl || ''} onChange={e => handleChange('posterUrl', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">URL de la portada (posterUrl)</span>
+                <input value={editing.posterUrl || ''} onChange={e => handleChange('posterUrl', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Ranking (rating) 0-10</span>
-                <input type="number" min={0} max={10} step={0.1} value={editing.rating ?? 0} onChange={e => handleChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Ranking (rating) 0-10</span>
+                <input type="number" min={0} max={10} step={0.1} value={editing.rating ?? 0} onChange={e => handleChange('rating', Number(e.target.value))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={!!editing.isActive} onChange={e => handleChange('isActive', e.target.checked)} />
-                <span className="text-sm text-gray-300">Activa</span>
+                <span className="text-sm text-gray-400">Activa</span>
               </label>
 
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={!!editing.isFeatured} onChange={e => handleChange('isFeatured', e.target.checked)} />
-                <span className="text-sm text-gray-300">Destacada</span>
+                <span className="text-sm text-gray-400">Destacada</span>
               </label>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={closeEditor} className="px-4 py-2 bg-gray-700 text-white rounded">Cancelar</button>
-              <button onClick={saveMovie} disabled={saving} className="px-4 py-2 bg-green-600 text-white rounded">{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+              <button onClick={closeEditor} className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Cancelar</button>
+              <button onClick={saveMovie} disabled={saving} className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white">{saving ? 'Guardando...' : 'Guardar cambios'}</button>
             </div>
           </div>
         </div>
@@ -241,64 +241,64 @@ export default function AdminPeliculasPage() {
       {/* Modal de creación */}
       {creating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-full max-w-2xl bg-gray-900 rounded-lg p-6">
+          <div className="w-full max-w-2xl rounded-lg p-6 bg-black text-white border border-gray-700">
             <h2 className="text-xl font-bold mb-4">Agregar película</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Título</span>
-                <input value={newMovie.title || ''} onChange={e => handleNewChange('title', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Título</span>
+                <input value={newMovie.title || ''} onChange={e => handleNewChange('title', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Slug</span>
-                <input value={newMovie.slug || ''} onChange={e => handleNewChange('slug', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Slug</span>
+                <input value={newMovie.slug || ''} onChange={e => handleNewChange('slug', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col col-span-2">
-                <span className="text-sm text-gray-300">Descripción</span>
-                <textarea value={newMovie.description || ''} onChange={e => handleNewChange('description', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded h-24" />
+                <span className="text-sm text-gray-400">Descripción</span>
+                <textarea value={newMovie.description || ''} onChange={e => handleNewChange('description', e.target.value)} className="mt-1 p-2 rounded h-24 bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Géneros (coma separada)</span>
-                <input value={(newMovie.genres || []).join(', ')} onChange={e => handleNewChange('genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Géneros (coma separada)</span>
+                <input value={(newMovie.genres || []).join(', ')} onChange={e => handleNewChange('genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Duración (min)</span>
-                <input type="number" value={newMovie.duration || ''} onChange={e => handleNewChange('duration', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Duración (min)</span>
+                <input type="number" value={newMovie.duration || ''} onChange={e => handleNewChange('duration', Number(e.target.value))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Director</span>
-                <input value={newMovie.director || ''} onChange={e => handleNewChange('director', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Director</span>
+                <input value={newMovie.director || ''} onChange={e => handleNewChange('director', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col col-span-2">
-                <span className="text-sm text-gray-300">URL de la portada (posterUrl)</span>
-                <input value={newMovie.posterUrl || ''} onChange={e => handleNewChange('posterUrl', e.target.value)} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">URL de la portada (posterUrl)</span>
+                <input value={newMovie.posterUrl || ''} onChange={e => handleNewChange('posterUrl', e.target.value)} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex flex-col">
-                <span className="text-sm text-gray-300">Ranking (rating) 0-10</span>
-                <input type="number" min={0} max={10} step={0.1} value={newMovie.rating ?? 0} onChange={e => handleNewChange('rating', Number(e.target.value))} className="mt-1 p-2 bg-gray-800 text-white rounded" />
+                <span className="text-sm text-gray-400">Ranking (rating) 0-10</span>
+                <input type="number" min={0} max={10} step={0.1} value={newMovie.rating ?? 0} onChange={e => handleNewChange('rating', Number(e.target.value))} className="mt-1 p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
 
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={!!newMovie.isActive} onChange={e => handleNewChange('isActive', e.target.checked)} />
-                <span className="text-sm text-gray-300">Activa</span>
+                <span className="text-sm text-gray-400">Activa</span>
               </label>
 
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={!!newMovie.isFeatured} onChange={e => handleNewChange('isFeatured', e.target.checked)} />
-                <span className="text-sm text-gray-300">Destacada</span>
+                <span className="text-sm text-gray-400">Destacada</span>
               </label>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={closeCreate} className="px-4 py-2 bg-gray-700 text-white rounded">Cancelar</button>
-              <button onClick={createMovie} disabled={saving} className="px-4 py-2 bg-green-600 text-white rounded">{saving ? 'Creando...' : 'Crear película'}</button>
+              <button onClick={closeCreate} className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Cancelar</button>
+              <button onClick={createMovie} disabled={saving} className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white">{saving ? 'Creando...' : 'Crear película'}</button>
             </div>
           </div>
         </div>
