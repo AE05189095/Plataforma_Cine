@@ -72,16 +72,12 @@ export default function AdminPeliculasPage() {
     try {
       const payloadObj: Record<string, unknown> = { ...newMovie };
       if (payloadObj.duration === '') payloadObj.duration = undefined;
-      const token = localStorage.getItem('app_token');
       const res = await fetch(`${API_BASE}/api/movies`, {
-       method: 'POST',
-      headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-  },
-  body: JSON.stringify(payloadObj),
-});
-
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadObj),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const created = await res.json();
       setMovies([created, ...movies]);
@@ -97,11 +93,7 @@ export default function AdminPeliculasPage() {
   const deleteMovie = async (id: string) => {
     if (!confirm('¿Eliminar esta película? Esta acción no se puede deshacer.')) return;
     try {
-      const token = localStorage.getItem('app_token');
-      const res = await fetch(`${API_BASE}/api/movies/${id}`, {
-       method: 'DELETE',
-      headers: {'Authorization': `Bearer ${token}`,},
-      });
+      const res = await fetch(`${API_BASE}/api/movies/${id}`, { method: 'DELETE', credentials: 'include' });
       if (res.status !== 204 && !res.ok) throw new Error(`HTTP ${res.status}`);
       setMovies(movies.filter(m => m._id !== id));
     } catch (err) {
@@ -114,16 +106,12 @@ export default function AdminPeliculasPage() {
     if (!editing) return;
     setSaving(true);
     try {
-     const token = localStorage.getItem('app_token');
-    const res = await fetch(`${API_BASE}/api/movies/${editing._id}`, {
-     method: 'PUT',
-    headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  },
-  body: JSON.stringify(editing),
-});
-
+      const res = await fetch(`${API_BASE}/api/movies/${editing._id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editing),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const updated = await res.json();
       setMovies(movies.map(m => m._id === updated._id ? updated : m));

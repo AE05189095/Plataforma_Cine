@@ -1,8 +1,6 @@
 const Movie = require('../models/Movie');
 const { spawn } = require('child_process');
 const path = require('path');
-const Log = require("../models/Log");
-
 
 // Ejecuta el script de sincronización de dominios si la variable de entorno
 // SYNC_IMAGE_DOMAINS está activada. Se ejecuta de forma asíncrona y no bloquea la respuesta HTTP.
@@ -66,13 +64,7 @@ exports.create = async (req, res) => {
     } catch (e) {
       console.error('Error lanzando sync script tras create:', e);
     }
-    //Log de creación pelicula
-   await Log.create({
-      usuario: req.user?._id,
-      role: 'admin',
-      accion: 'creacion',
-      descripcion: `El administrador ${req.user?.username || 'desconocido'} agregó la película "${movie.title}".`
-    });
+
     res.status(201).json(movie);
   } catch (err) {
     console.error('movieController.create error:', err);
@@ -86,19 +78,6 @@ exports.update = async (req, res) => {
     const updated = await Movie.findByIdAndUpdate(id, req.body, { new: true });
     if (!updated) return res.status(404).json({ message: 'Película no encontrada' });
 
-    if (req.user && req.user._id) {
-    try {
-    const log = await Log.create({
-      usuario: req.user._id,
-      role: "admin",
-      accion: "modificacion",
-      descripcion: `El administrador ${req.user.username || 'desconocido'} modificó la película "${updated.title}".`,
-    });
-    console.log("Log creado:", log);
-  } catch (e) {
-    console.error("Error creando Log:", e);
-  }
-}
     // Si se actualizó posterUrl o se proporcionó en el body, lanzar sincronización
     try {
       const posterFromBody = req.body && req.body.posterUrl;
@@ -120,25 +99,7 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Movie.findByIdAndDelete(id);
-
-    if (!deleted) return res.status(404).json({ message: 'Película no encontrada' });
-
-    // Log de eliminación de película
-    if (req.user && req.user._id) {
-      try {
-        const log = await Log.create({
-          usuario: req.user._id,
-          role: 'admin',
-          accion: 'eliminacion',
-          descripcion: `El administrador ${req.user.username || 'desconocido'} eliminó la película "${deleted.title}".`,
-        });
-        console.log('Log de eliminación creado:', log);
-      } catch (e) {
-        console.error('Error creando log de eliminación:', e);
-      }
-    }
-
+    await Movie.findByIdAndDelete(id);
     res.status(204).end();
   } catch (err) {
     console.error('movieController.remove error:', err);

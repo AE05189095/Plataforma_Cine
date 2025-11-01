@@ -14,13 +14,12 @@ const authMiddleware = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { _id: decoded.userId, role: decoded.role, username: decoded.username, };
+    req.user = { _id: decoded.userId, role: decoded.role };
     next();
   } catch (err) {
     console.error('JWT Verification Error:', err.message);
     return res.status(401).json({ message: 'Token inválido o expirado' });
   }
 };
-
 
 module.exports = authMiddleware;

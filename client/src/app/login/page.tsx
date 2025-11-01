@@ -41,7 +41,6 @@ export default function LoginPage({ userType }: LoginPageProps) {
       }
 
   localStorage.setItem(TOKEN_KEY, data.token);
-  localStorage.setItem('token', data.token);
       // Dispatch event so header updates without reload
       try { window.dispatchEvent(new CustomEvent('authChange')); } catch {}
 
