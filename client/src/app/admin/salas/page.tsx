@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import DarkSelect from '@/components/DarkSelect';
 import ConfirmModal from '@/components/ConfirmModal';
-import { API_BASE, TOKEN_KEY } from "@/lib/config";
+import { API_BASE } from "@/lib/config";
 
 type Hall = {
   _id: string;
@@ -55,7 +55,7 @@ export default function AdminSalasPage() {
     while (attempt <= maxRetries) {
       try {
         // Obtener listado plano de salas (mostraremos las 6 disponibles)
-        const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+        const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
         const res = await fetch(`${API_BASE}/api/halls`, { credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : undefined });
         if (res.ok) {
           const data = await res.json();
@@ -107,7 +107,7 @@ export default function AdminSalasPage() {
 
   const fetchMovies = async () => {
     try {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
   const res = await fetch(`${API_BASE}/api/movies?admin=1`, { credentials: 'include', headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -205,7 +205,7 @@ export default function AdminSalasPage() {
             </div>
             <div className="flex justify-end gap-3 mt-4">
               <button onClick={() => setCreating(false)} className="px-3 py-1 bg-gray-700 text-white rounded">Cancelar</button>
-              <button onClick={async () => { try { const payload = { name: newHall.name, capacity: newHall.capacity, isActive: newHall.isActive, movie: newHall.movie }; const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null; const headers: Record<string,string> = { 'Content-Type': 'application/json' }; if (token) headers.Authorization = `Bearer ${token}`; const res = await fetch(`${API_BASE}/api/halls`, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(payload) }); if (!res.ok) throw new Error(`HTTP ${res.status}`); setCreating(false); await fetchHalls(); } catch (err) { console.error(err); alert('Error creando sala'); } }} className="px-3 py-1 bg-green-600 text-white rounded">Crear</button>
+              <button onClick={async () => { try { const payload = { name: newHall.name, capacity: newHall.capacity, isActive: newHall.isActive, movie: newHall.movie }; const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null; const headers: Record<string,string> = { 'Content-Type': 'application/json' }; if (token) headers.Authorization = `Bearer ${token}`; const res = await fetch(`${API_BASE}/api/halls`, { method: 'POST', credentials: 'include', headers, body: JSON.stringify(payload) }); if (!res.ok) throw new Error(`HTTP ${res.status}`); setCreating(false); await fetchHalls(); } catch (err) { console.error(err); alert('Error creando sala'); } }} className="px-3 py-1 bg-green-600 text-white rounded">Crear</button>
             </div>
           </div>
         </div>
@@ -248,7 +248,7 @@ export default function AdminSalasPage() {
                   if (typeof editingHall.name === 'string') payload.name = editingHall.name;
                   if (typeof editingHall.capacity === 'number') payload.capacity = editingHall.capacity;
 
-                  const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+                  const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
                   const headers: Record<string,string> = { 'Content-Type': 'application/json' };
                   if (token) headers.Authorization = `Bearer ${token}`;
                   const res = await fetch(`${API_BASE}/api/halls/${editingHall._id}`, { method: 'PUT', credentials: 'include', headers, body: JSON.stringify(payload) });
@@ -274,7 +274,7 @@ export default function AdminSalasPage() {
       <ConfirmModal open={confirmOpen} small={true} title="Liberar horarios" message="¿Desactivar todos los horarios asociados a esta sala? Esto no se puede deshacer fácilmente." onCancel={() => { setConfirmOpen(false); setConfirmHallId(null); }} onConfirm={async () => {
         try {
           if (!confirmHallId) return;
-          const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+          const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
           const headers: Record<string,string> = {};
           if (token) headers.Authorization = `Bearer ${token}`;
           const hallId = String(confirmHallId);

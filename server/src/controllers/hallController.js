@@ -1,4 +1,5 @@
 const Hall = require('../models/Hall');
+const Log = require ('../models/Log');
 
 exports.list = async (req, res) => {
   try {
@@ -52,9 +53,19 @@ exports.update = async (req, res) => {
       // Aplicar cambios permitidos (no permitir cambiar capacity)
       Object.assign(hall, allowed);
       await hall.save();
+      
       return res.json(hall);
     }
-
+    try {
+        await Log.create({
+          usuario: req.user?._id,
+          role: req.user?.role || 'admin',
+          accion: 'modificacion',
+          descripcion: `El administrador ${req.user?.username || 'desconocido'} modificó la sala "${hall.name}" asignando la película "${hall.movie?.title || 'sin asignar'}".`
+        });
+      } catch (logErr) {
+        console.error('Error registrando log de modificación de sala:', logErr);
+      }
     // Comportamiento normal para salas no fijas
     const updated = await Hall.findByIdAndUpdate(id, payload, { new: true });
     res.json(updated);
