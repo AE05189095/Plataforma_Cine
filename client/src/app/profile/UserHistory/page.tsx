@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/Protectedroute";
 import { API_BASE, TOKEN_KEY } from "@/lib/config";
+import { useRouter } from "next/navigation";
 
 type ShowtimeType = {
   _id: string;
@@ -29,6 +30,7 @@ function isShowtimeObject(showtime: string | ShowtimeType): showtime is Showtime
 }
 
 export default function UserHistoryPage() {
+  const router = useRouter();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +119,16 @@ export default function UserHistoryPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white p-8 max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-amber-300 mb-4">Historial de entradas</h1>
+
+      {/* BOTÓN DE REGRESAR */}
+      <div
+      onClick={() => router.back()}
+      className="inline-flex items-center gap-2 px-4 py-2 mb-4 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-amber-400 hover:shadow-lg transition-all cursor-pointer select-none"
+      >
+      <span className="text-xl">←</span>
+      <span>Regresar</span>
+      </div>
+      <h1 className="text-2xl font-bold text-amber-300 mb-4">Historial de entradas</h1>
 
         {message && (
           <div className={message.type === "error" ? "text-red-400 mb-2" : "text-green-400 mb-2"}>
