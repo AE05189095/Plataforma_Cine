@@ -1,53 +1,20 @@
-/*const Reservation = require('../models/Reservation.js');
+const Reservation = require('../models/Reservation');
 
-exports.getReservations = async (req, res) => {
-  const { movie, date, user, estado } = req.query;
-  const filters = {};
-
-  if (movie) filters['showtimeId.movieId.title'] = movie;
-  if (date) filters['showtimeId.startTime'] = { $gte: new Date(date) };
-  if (user) filters['userId.email'] = user;
-  if (estado) filters.estado = estado;
-  
-  const reservations = await Reservation.find(filters)
-      .populate('userId', 'email')
+exports.getAllReservations = async (req, res) => {
+  try {
+    const reservations = await Reservation.find({})
       .populate({
         path: 'showtimeId',
         populate: [
-          { path: 'movieId', select: 'title' },
-          { path: 'hallId', select: 'name' }
+          { path: 'movie', model: 'Movie', select: 'title' },
+          { path: 'hall', model: 'Hall', select: 'name' }
         ]
-      });
-      
-      res.json(reservations);
+      })
+      .populate('userId', 'email') // Trae solo el email del usuario
+      .sort({ createdAt: -1 });
 
-  
-      
-};
-*/
-
-const Reservation = require('../models/Reservation.js');
-
-exports.getReservations = async (req, res) => {
-  const { movie, date, user, estado } = req.query;
-  const filters = {};
-
-  if (movie) filters['showtimeId.movieId.title'] = movie;
-  if (date) filters['showtimeId.startTime'] = { $gte: new Date(date) };
-  if (user) filters['userId.email'] = user;
-  if (estado) filters.estado = estado;
-
-  // Si no usás populate, usá esto:
-  const reservations = await Reservation.find(filters);
-  res.json(reservations);
-};
-
-// ✅ ESTA FUNCIÓN DEBE ESTAR FUERA, NO DENTRO DE getReservations
-exports.getReservationsRaw = async (req, res) => {
-  try {
-    const reservations = await Reservation.find({ test: true });
     res.json(reservations);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener reservas embebidas' });
+    res.status(500).json({ message: 'Error al obtener las reservas', error: error.message });
   }
 };

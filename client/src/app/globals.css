@@ -76,3 +76,11 @@ select:focus, input:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
   border-color: rgba(249,115,22,0.9);
 }
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE y Edge */
+}
