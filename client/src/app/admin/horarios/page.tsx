@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import DarkSelect from '@/components/DarkSelect';
 import { io, Socket } from 'socket.io-client';
 import ConfirmModal from '@/components/ConfirmModal';
-import { API_BASE, TOKEN_KEY } from "../../../lib/config";
+import { API_BASE} from "../../../lib/config";
 import { useSearchParams } from 'next/navigation';
 
 type Movie = { _id: string; title: string; duration?: number };
@@ -36,7 +36,7 @@ export default function AdminHorariosPage() {
 
   const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
   const searchParams = useSearchParams();
 
   // Socket para actualizaciones en tiempo real
@@ -99,21 +99,27 @@ export default function AdminHorariosPage() {
   
 
   const loadShowtimes = async () => {
-    const res = await fetch(`${API_BASE}/api/showtimes`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/showtimes`, { headers });
     if (!res.ok) throw new Error('No se pudo obtener showtimes');
     const data = await res.json();
     setShowtimes(data || []);
   };
 
   const loadMovies = async () => {
-    const res = await fetch(`${API_BASE}/api/movies`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/movies`, { headers });
     if (!res.ok) return setMovies([]);
     const data = await res.json();
     setMovies(data || []);
   };
 
   const loadHalls = async () => {
-    const res = await fetch(`${API_BASE}/api/halls`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/halls`, {headers});
     if (!res.ok) return setHalls([]);
     const data = await res.json();
     setHalls(data || []);
@@ -186,7 +192,7 @@ export default function AdminHorariosPage() {
       }
 
       const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0 };
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let res;
