@@ -11,14 +11,19 @@ type Seat = {
 
 interface ReservationSummaryProps {
     seats: Seat[];
-    showtimeId: string | null;
     expirationTime: Date | null; 
     onExpiration: () => void;
     onPurchase: () => void;
-    perSeatPrice?: number | null; // si se pasa, usar por asiento
+    perSeatPrice?: number | null; // si se pasa, usar por asiento (deprecated a favor de regularPrice/premiumPrice)
+    regularPrice?: number | null; // si ambos están presentes, usar diferenciación por asiento
+    premiumPrice?: number | null;
 }
 
-const calculateTotal = (seats: Seat[], perSeatPrice?: number | null) => {
+const calculateTotal = (seats: Seat[], perSeatPrice?: number | null, regularPrice?: number | null, premiumPrice?: number | null) => {
+    // Preferir precios diferenciados si ambos están definidos
+    if (typeof regularPrice === 'number' && typeof premiumPrice === 'number' && !Number.isNaN(regularPrice) && !Number.isNaN(premiumPrice)) {
+        return seats.reduce((acc, s) => acc + (s.status === 'premium' ? premiumPrice : regularPrice), 0);
+    }
     if (typeof perSeatPrice === 'number' && !Number.isNaN(perSeatPrice)) {
         return seats.length * perSeatPrice;
     }
@@ -52,8 +57,8 @@ const CountdownTimer = ({ expirationTime, onExpiration }: { expirationTime: Date
     );
 };
 
-export default function ReservationSummary({ seats, showtimeId, expirationTime, onExpiration, onPurchase, perSeatPrice }: ReservationSummaryProps) {
-    const total = calculateTotal(seats, perSeatPrice ?? null);
+export default function ReservationSummary({ seats, expirationTime, onExpiration, onPurchase, perSeatPrice, regularPrice, premiumPrice }: ReservationSummaryProps) {
+    const total = calculateTotal(seats, perSeatPrice ?? null, regularPrice ?? null, premiumPrice ?? null);
 
     return (
         <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 w-full">

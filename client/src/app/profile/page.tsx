@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
-import { API_BASE, TOKEN_KEY } from "@/lib/config";
+import { API_BASE} from "@/lib/config";
 
 type User = { id: string; username: string; email: string } | null;
 
@@ -22,7 +22,7 @@ export default function ProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = localStorage.getItem('app_token');
         if (!token) {
           setError('No autenticado');
           setLoading(false);
@@ -53,21 +53,18 @@ export default function ProfilePage() {
   }, []);
 
   const handleLogout = async () => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem('app_token');
   if (!token) {
     router.push("/");
     return;
   }
   try {
-    // Decodificar payload del JWT
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const userId = payload.userId;
-    const role = payload.role;
     // Registrar logout en el backend
     const res = await fetch(`${API_BASE}/api/auth/logout`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, role }),
+      headers: { "Content-Type": "application/json",
+                 Authorization: `Bearer ${token}`,
+       },
     });
     const data = await res.json();
     console.log("Logout registrado:", data.message);
@@ -75,7 +72,7 @@ export default function ProfilePage() {
     console.error("Error registrando logout:", error);
   } finally {
     // Eliminar token local y redirigir siempre
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('app_token');
     router.push("/");
   }
 };
@@ -84,7 +81,7 @@ export default function ProfilePage() {
   const submitChange = async () => {
     setChanging(true);
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
+      const token = localStorage.getItem('app_token');
       if (!token) throw new Error('No autenticado');
       const res = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: 'POST',
