@@ -21,6 +21,8 @@ const showtimeSchema = new mongoose.Schema(
         date: { type: String, required: true }, // formato 'YYYY-MM-DD'
         time: { type: String, required: true }, // formato 'HH:mm'
         price: { type: Number, required: true, default: 0 },
+        // Precio premium (para filas VIP como A y B). Si es 0, se asume no configurado y el frontend puede usar su default.
+        premiumPrice: { type: Number, required: false, default: 0 },
     // Capacidad snapshot tomada de la sala en el momento de crear la función.
     capacity: { type: Number },
         seatsBooked: [{ type: String }], // Asientos vendidos permanentemente
