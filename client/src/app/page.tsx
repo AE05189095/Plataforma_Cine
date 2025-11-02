@@ -186,15 +186,14 @@ export default function HomePage() {
             />
 
             <main className="container mx-auto p-4 sm:p-8">
-                <section className="text-center pt-10 pb-16">
-                    <h1 className="text-4xl sm:text-6xl font-extrabold text-orange-500 mb-2">
+               <section className="text-center pt-6 sm:pt-10 pb-10 sm:pb-16 px-4">
+                    <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-orange-500 mb-3 leading-tight">
                         Cartelera CineGT
                     </h1>
-                    <p className="text-xl text-gray-400">
+                    <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
                         Disfruta del mejor cine en Guatemala con la experiencia cinematográfica más emocionante
                     </p>
-                </section>
-
+                    </section>
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {filteredMovies.length > 0 ? (
                         filteredMovies.map((movie, index) => (
