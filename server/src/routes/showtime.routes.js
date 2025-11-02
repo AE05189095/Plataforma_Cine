@@ -2,15 +2,16 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/showtimeController');
 const authMiddleware = require('./middleware/authMiddleware');
+const adminMiddleware = require('./middleware/adminMiddleware');
 
 // Rutas públicas
 router.get('/', controller.list);
 router.get('/:id', controller.get);
 
 // ADMIN CRUD (requiere autenticación y rol admin)
-router.post('/', authMiddleware, controller.create);
-router.patch('/:id', authMiddleware, controller.update);
-router.delete('/:id', authMiddleware, controller.remove);
+router.post('/', authMiddleware,adminMiddleware, controller.create);
+router.patch('/:id', authMiddleware, adminMiddleware,controller.update);
+router.delete('/:id', authMiddleware, adminMiddleware,controller.remove);
 
 // ADMIN: limpiar locks manualmente (limpia embebidos y colección SeatLock)
 router.delete('/:id/locks', authMiddleware, controller.clearLocks);

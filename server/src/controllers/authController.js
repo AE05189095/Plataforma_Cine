@@ -232,7 +232,7 @@ try {
 
 
     const token = jwt.sign(
-      { userId: user._id, role: fixedRole },
+      { userId: user._id, role: fixedRole, username: user.username},
       JWT_SECRET,
       { expiresIn: "30m" }
     );
@@ -373,5 +373,40 @@ await Log.create({
     }
 };
 
+const logout = async (req, res) => {
+  try {
+    const { _id: userId, role } = req.user;
 
-module.exports = {loginController, registerController, loginAdmin, loginColab,meController, changePasswordController};
+    if (!userId || !role) {
+      return res.status(400).json({ message: "Usuario no autenticado" });
+    }
+
+    let username = "Desconocido";
+
+    if (role === "cliente") {
+      const user = await User.findById(userId);
+      if (user) username = user.username;
+    } else if (role === "admin") {
+      const admin = await Admin.findById(userId);
+      if (admin) username = admin.username;
+    } else if (role === "colaborador") {
+      const colab = await Colab.findById(userId);
+      if (colab) username = colab.username;
+    }
+
+    await Log.create({
+      usuario: userId,
+      role,
+      accion: "cierre_sesion",
+      descripcion: `El usuario ${username} cerró sesión.`,
+    });
+
+    res.clearCookie("jwt", { path: "/" });
+    return res.json({ message: "Sesión cerrada correctamente." });
+  } catch (error) {
+    console.error("Error en logout:", error);
+    return res.status(500).json({ message: "Error interno del servidor." });
+  }
+};
+
+module.exports = {loginController, registerController, loginAdmin, loginColab,meController, changePasswordController,logout};

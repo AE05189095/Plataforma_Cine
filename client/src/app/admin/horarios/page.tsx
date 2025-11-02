@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import DarkSelect from '@/components/DarkSelect';
 import { io, Socket } from 'socket.io-client';
 import ConfirmModal from '@/components/ConfirmModal';
-import { API_BASE, TOKEN_KEY } from "../../../lib/config";
+import { API_BASE} from "../../../lib/config";
 import { useSearchParams } from 'next/navigation';
 
 type Movie = { _id: string; title: string; duration?: number };
@@ -37,7 +37,7 @@ export default function AdminHorariosPage() {
 
   const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('app_token') : null;
   const searchParams = useSearchParams();
 
   // Socket para actualizaciones en tiempo real
@@ -100,21 +100,27 @@ export default function AdminHorariosPage() {
   
 
   const loadShowtimes = async () => {
-    const res = await fetch(`${API_BASE}/api/showtimes`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/showtimes`, { headers });
     if (!res.ok) throw new Error('No se pudo obtener showtimes');
     const data = await res.json();
     setShowtimes(data || []);
   };
 
   const loadMovies = async () => {
-    const res = await fetch(`${API_BASE}/api/movies`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/movies`, { headers });
     if (!res.ok) return setMovies([]);
     const data = await res.json();
     setMovies(data || []);
   };
 
   const loadHalls = async () => {
-    const res = await fetch(`${API_BASE}/api/halls`);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/api/halls`, {headers});
     if (!res.ok) return setHalls([]);
     const data = await res.json();
     setHalls(data || []);
@@ -174,7 +180,7 @@ export default function AdminHorariosPage() {
         if (st.endAt) sEnd = new Date(st.endAt);
         else {
           const stMovie = typeof st.movie === 'string' ? movies.find(m => m._id === st.movie) : st.movie;
-          const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stMovie.duration : DEFAULT_DURATION_MIN;
+          const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stDur : DEFAULT_DURATION_MIN;
           sEnd = new Date(sStart.getTime() + stDur * 60000);
         }
         if (overlapsFn(startAtDate, endAtDate, sStart, sEnd)) {
@@ -186,8 +192,9 @@ export default function AdminHorariosPage() {
         }
       }
 
-    const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0, premiumPrice: form.premiumPrice ? Number(form.premiumPrice) : 0 };
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      // 💥 CONFLICTO RESUELTO: Aceptamos premiumPrice del hotfix
+      const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0, premiumPrice: form.premiumPrice ? Number(form.premiumPrice) : 0 };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       let res;
@@ -268,32 +275,32 @@ export default function AdminHorariosPage() {
           <tbody style={{ color: 'rgba(255,255,255,0.9)' }}>
               {loading && (
               <tr><td colSpan={7} className="px-4 py-6 text-center">Cargando...</td></tr>
-            )}
-            {!loading && showtimes.length === 0 && (
+              )}
+              {!loading && showtimes.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-6 text-center">No hay funciones definidas</td></tr>
-            )}
-            {!loading && showtimes.map((st) => {
-              const movie = typeof st.movie === 'string' ? null : (st.movie as Movie);
-              const hall = typeof st.hall === 'string' ? null : (st.hall as Hall);
-              const dt = new Date(st.startAt);
-              // Mostrar fecha/hora en zona local (evitar confusión con toISOString que usa UTC)
-              const dateStr = dt.toLocaleDateString('en-CA');
-              const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-              return (
-                <tr key={st._id} className="border-t border-gray-800">
-                  <td className="px-4 py-3">{movie?.title || '—'}</td>
-                  <td className="px-4 py-3">{dateStr}</td>
-                  <td className="px-4 py-3">{timeStr}</td>
-                  <td className="px-4 py-3">{hall?.name || '—'}</td>
-                  <td className="px-4 py-3">{formatPrice(st.price)}</td>
-                  <td className="px-4 py-3">{formatPrice(typeof st.premiumPrice === 'number' ? st.premiumPrice : 0)}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => openEdit(st)} className="mr-3 text-sm px-2 py-1 rounded btn-primary">Editar</button>
-                    <button onClick={() => handleDelete(st._id)} className="text-sm" style={{ color: '#ff6b6b' }}>Eliminar</button>
-                  </td>
-                </tr>
-              );
-            })}
+              )}
+              {!loading && showtimes.map((st) => {
+                const movie = typeof st.movie === 'string' ? null : (st.movie as Movie);
+                const hall = typeof st.hall === 'string' ? null : (st.hall as Hall);
+                const dt = new Date(st.startAt);
+                // Mostrar fecha/hora en zona local (evitar confusión con toISOString que usa UTC)
+                const dateStr = dt.toLocaleDateString('en-CA');
+                const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <tr key={st._id} className="border-t border-gray-800">
+                    <td className="px-4 py-3">{movie?.title || '—'}</td>
+                    <td className="px-4 py-3">{dateStr}</td>
+                    <td className="px-4 py-3">{timeStr}</td>
+                    <td className="px-4 py-3">{hall?.name || '—'}</td>
+                    <td className="px-4 py-3">{formatPrice(st.price)}</td>
+                    <td className="px-4 py-3">{formatPrice(typeof st.premiumPrice === 'number' ? st.premiumPrice : 0)}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEdit(st)} className="mr-3 text-sm px-2 py-1 rounded btn-primary">Editar</button>
+                      <button onClick={() => handleDelete(st._id)} className="text-sm" style={{ color: '#ff6b6b' }}>Eliminar</button>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
