@@ -259,7 +259,7 @@ exports.create = async (req, res) => {
       // No abortamos la transacción completa por un fallo en guardar seatlocks,
       // pero lo registramos para investigarlo.
     }
-    
+
     // Log de compra
     try {
       await Log.create([{
@@ -272,34 +272,56 @@ exports.create = async (req, res) => {
       console.error('Error registrando log de compra:', logErr);
     }
 
-    // Crear la reserva en la colección de Reservas
-    await Reservation.create([{
-      userId,
-      showtimeId: showtimeId,
-      seats,
-      totalPrice: totalQ,
-      estado: 'confirmada',
-    }], { session });
+    // --- LÓGICA DE RESERVA ACTUALIZADA ---
+    // En lugar de crear una nueva, buscamos la reserva 'pendiente' y la actualizamos a 'confirmada'.
+    const pendingReservation = await Reservation.findOneAndUpdate(
+      {
+        userId,
+        showtimeId: showtimeId,
+        estado: 'pendiente',
+        // Opcional: verificar que los asientos coincidan para mayor seguridad
+        // seats: { $all: seats, $size: seats.length } 
+      },
+      {
+        $set: {
+          estado: 'confirmada',
+          totalPrice: totalQ,
+          paymentIntentId: paymentInfo.paymentIntentId, // Guardar info del pago
+        },
+        $unset: { expiresAt: "" } // Eliminar el campo de expiración
+      },
+      { session, sort: { createdAt: -1 } } // Si hay varias, toma la más reciente
+    );
 
     await session.commitTransaction();
 
     // Emitir eventos de socket
     try {
       const io = req.app.get('io');
-      if (io && !isSimulated) { // Solo emitir para showtimes reales
+      const remainingLocks = await SeatLock.find({ showtimeId: purchase.showtime }).lean();
+      const lockedSeats = remainingLocks.map(lock => lock.seatId);
+
+      if (io && !isSimulated) {
         const freshShowtime = await Showtime.findById(showtimeId).lean();
         const occupiedSeats = freshShowtime?.seatsBooked || [];
         const cap = (typeof freshShowtime?.capacity === 'number') ? freshShowtime.capacity : (freshShowtime?.hall?.capacity || 0);
+
         io.emit('showtimeUpdated', {
           _id: showtimeId,
           seatsBooked: [...occupiedSeats],
           availableSeats: Math.max(0, cap - occupiedSeats.length),
         });
-        io.emit('seatsLocked', { showtimeId, seats: [] }); // Limpiar locks para todos
+
+        io.emit('seatsLocked', {
+          showtimeId: purchase.showtime,
+          seats: lockedSeats
+        });
       }
     } catch (e) {
       console.error('Error emitiendo eventos:', e);
     }
+
+
 
     // ==========================================================
     // Preparar fecha y hora para correo
@@ -392,8 +414,15 @@ exports.cancel = async (req, res) => {
     // Actualizar el estado de la reserva correspondiente a 'cancelada'
     try {
       await Reservation.findOneAndUpdate(
-        { userId: purchase.user, showtimeId: purchase.showtime, estado: 'confirmada' },
-        { $set: { estado: 'cancelada' } }
+        // Búsqueda más robusta: no depender del estado 'confirmada'.
+        // Usamos una combinación única de campos para encontrar la reserva correcta.
+        {
+          userId: purchase.user,
+          showtimeId: purchase.showtime,
+          seats: purchase.seats
+        },
+        { $set: { estado: 'cancelada' } },
+        { sort: { createdAt: -1 } } // Si hay duplicados, actualiza el más reciente.
       );
     } catch (reservationError) {
       console.error('Error al actualizar el estado de la reserva:', reservationError);
@@ -422,10 +451,19 @@ exports.cancel = async (req, res) => {
       const io = req.app.get('io');
       if (io && purchase.showtime) {
         const showtime = await Showtime.findById(purchase.showtime).lean();
-        const occupiedSeats = showtime?.seatsBooked || [];
-        const newSeats = occupiedSeats.filter(s => !purchase.seats.includes(s));
+        const occupiedSeats = showtime?.seatsBooked || []; // Asientos actualmente ocupados
+        const seatsToRelease = [...purchase.seats]; // Convertimos los asientos de la compra a un array plano
 
-        await Showtime.findByIdAndUpdate(purchase.showtime, { seatsBooked: newSeats });
+        // Filtramos los asientos ocupados, quedándonos solo con los que NO están en la lista de asientos a liberar.
+        const newSeats = occupiedSeats.filter(s => !seatsToRelease.includes(s));
+
+        // Actualización robusta del Showtime:
+        // 1. $pullAll: Elimina todos los asientos cancelados de la lista 'seatsBooked'.
+        // 2. $pull: Elimina el objeto de bloqueo completo del array 'seatsLocks' que pertenece al usuario que cancela.
+        await Showtime.findByIdAndUpdate(purchase.showtime, {
+          $pullAll: { seatsBooked: seatsToRelease },
+          $pull: { seatsLocks: { userId: purchase.user } }
+        });
 
         const cap2 = (typeof showtime?.capacity === 'number') ? showtime.capacity : (showtime?.hall?.capacity || 0);
         io.emit('showtimeUpdated', {
