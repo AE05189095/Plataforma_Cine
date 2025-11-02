@@ -21,21 +21,10 @@ interface ShowtimeResponse {
   startAt?: string;
   hall?: { name?: string };
   price?: number;
+  premiumPrice?: number;
 }
 
-interface PaymentPayload {
-  method: 'card' | 'paypal';
-  card?: {
-    number: string;
-    name: string;
-    expMonth: string;
-    expYear: string;
-    cvv: string;
-  };
-  paypal?: {
-    email: string;
-  };
-}
+// (PaymentPayload interface removed - not used here)
 
 const MAX_SEATS = 10;
 
@@ -236,7 +225,14 @@ export default function ComprarPage() {
               <div className="text-slate-400 mb-4">
                 Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —
                 Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —
-                Precio: <span className="text-white font-semibold">{formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))}</span>
+                {typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0
+                  ? (
+                    <>
+                      Precio: <span className="text-white font-semibold">{formatCurrency(showtime.price ?? getPriceForHall(showtime?.hall?.name))} (Reg) / {formatCurrency(showtime.premiumPrice)} (Prem)</span>
+                    </>
+                  ) : (
+                    <>Precio: <span className="text-white font-semibold">{formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))}</span></>
+                  )}
               </div>
             ) : (
               <div className="text-red-400 mb-4">Error al cargar la función</div>
@@ -256,11 +252,11 @@ export default function ComprarPage() {
               <div className="lg:col-span-1 flex justify-center">
                 <ReservationSummary
                   seats={selected}
-                  showtimeId={showtimeId}
                   expirationTime={expirationTime}
                   onExpiration={handleExpiration}
                   onPurchase={handlePurchase}
-                  perSeatPrice={typeof showtime?.price === 'number' ? showtime.price : null}
+                  regularPrice={typeof showtime?.price === 'number' ? showtime.price : null}
+                  premiumPrice={typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0 ? showtime.premiumPrice : null}
                 />
               </div>
             </div>

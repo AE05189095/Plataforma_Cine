@@ -302,7 +302,7 @@ exports.create = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
 
-    const { movie: movieId, hall: hallId, startAt: startAtRaw, price } = req.body;
+  const { movie: movieId, hall: hallId, startAt: startAtRaw, price, premiumPrice } = req.body;
     if (!movieId || !hallId || !startAtRaw) return res.status(400).json({ message: 'movie, hall y startAt son requeridos' });
 
     const movie = await Movie.findById(movieId);
@@ -338,6 +338,7 @@ exports.create = async (req, res) => {
       date: toYMD(startAt),
       time: toHHmm(startAt),
       price: typeof price === 'number' ? price : 0,
+      premiumPrice: typeof premiumPrice === 'number' ? premiumPrice : 0,
       capacity: typeof hall.capacity === 'number' ? hall.capacity : undefined,
       isActive: true,
     });
@@ -408,7 +409,8 @@ exports.update = async (req, res) => {
     existing.endAt = endAt;
     existing.date = toYMD(startAt);
     existing.time = toHHmm(startAt);
-    if (typeof payload.price === 'number') existing.price = payload.price;
+  if (typeof payload.price === 'number') existing.price = payload.price;
+  if (typeof payload.premiumPrice === 'number') existing.premiumPrice = payload.premiumPrice;
     if (typeof payload.isActive === 'boolean') existing.isActive = payload.isActive;
 
     await existing.save();
