@@ -180,7 +180,9 @@ export default function AdminHorariosPage() {
         if (st.endAt) sEnd = new Date(st.endAt);
         else {
           const stMovie = typeof st.movie === 'string' ? movies.find(m => m._id === st.movie) : st.movie;
-          const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stDur : DEFAULT_DURATION_MIN;
+          const stDur: number = stMovie && typeof (stMovie as Movie).duration === 'number' && (stMovie as Movie).duration! > 0
+            ? (stMovie as Movie).duration!
+            : DEFAULT_DURATION_MIN;
           sEnd = new Date(sStart.getTime() + stDur * 60000);
         }
         if (overlapsFn(startAtDate, endAtDate, sStart, sEnd)) {

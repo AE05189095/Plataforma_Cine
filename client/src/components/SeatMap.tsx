@@ -13,6 +13,11 @@ type Props = {
   currentSelectedObjects: Seat[];
   onSelectionChange?: (seat: Seat) => void; // se envía solo el asiento clickeado
   onMaxSelectionAttempt?: () => void;
+  /**
+   * Si true, alinea el mapa a la izquierda en vez de centrarlo.
+   * Útil para pantallas con layout dividido (mapa izquierda / resumen derecha).
+   */
+  alignLeft?: boolean;
 };
 
 const MAX_SEATS = 10;
@@ -25,7 +30,8 @@ export default function SeatMap({
   selectedSeats = [],
   currentSelectedObjects = [],
   onSelectionChange,
-  onMaxSelectionAttempt
+  onMaxSelectionAttempt,
+  alignLeft = false
 }: Props) {
 
   const makeSeat = useCallback((row: string, num: number): Seat => {
@@ -70,18 +76,18 @@ export default function SeatMap({
   };
 
   return (
-    <div className="bg-gray-900 p-8 rounded-xl shadow-2xl border border-gray-700 flex flex-col items-center">
-      <div className="flex justify-center mb-6">
+    <div className={`bg-gray-900 p-8 rounded-xl shadow-2xl border border-gray-700 flex flex-col ${alignLeft ? 'items-start' : 'items-center'}`}>
+      <div className={`flex ${alignLeft ? 'justify-start' : 'justify-center'} mb-6 w-full`}>
         <div className="bg-red-600 text-white px-6 py-2 rounded-xl font-semibold border border-red-600">
           PANTALLA
         </div>
       </div>
 
-      <div className="mb-4 text-center text-white font-semibold">
+      <div className={`mb-4 ${alignLeft ? 'text-left' : 'text-center'} text-white font-semibold`}>
         Asientos seleccionados: {currentSelectedObjects.length} / {MAX_SEATS}
       </div>
 
-      <div className="w-full flex justify-center">
+      <div className={`w-full flex ${alignLeft ? 'justify-start' : 'justify-center'}`}>
         <div className="space-y-2">
           {rows.map(row => (
             <div key={row} className="grid gap-2 items-center" style={{ gridTemplateColumns: `20px repeat(${cols}, 48px)` }}>
