@@ -2,11 +2,10 @@
 import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-
+import { io } from 'socket.io-client';
 import { API_BASE, TOKEN_KEY } from "../../../lib/config";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
-
 
 interface Reserva {
   _id: string;
@@ -18,7 +17,7 @@ interface Reserva {
   };
   seats: string[];
   totalPrice: number;
-  estado: string; // e.g. 'confirmada', 'cancelada'
+  estado: 'confirmada' | 'cancelada' | 'pendiente'; // e.g. 'confirmada', 'cancelada'
   createdAt: string;
   test?: boolean; // 👈 campo opcional
 }
@@ -51,6 +50,23 @@ export default function AdminReservasPage() {
 
   useEffect(() => {
     fetchReservas();
+    // Socket para actualizaciones en tiempo real
+    const socket = io(API_BASE, {
+      transports: ['websocket', 'polling'],
+    });
+
+    // Cuando una compra se cancela, el backend emite 'showtimeUpdated'.
+    // Usamos este evento como señal para recargar las reservas, ya que una de ellas
+    // habrá cambiado su estado a 'cancelada'.
+    const handleUpdate = () => {
+      fetchReservas(filtros); // Recargar con los filtros actuales
+    };
+
+    socket.on('showtimeUpdated', handleUpdate);
+    return () => {
+      socket.off('showtimeUpdated', handleUpdate);
+      socket.disconnect();
+    };
   }, []);
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -231,12 +247,13 @@ export default function AdminReservasPage() {
 
         <div className="p-4 rounded-lg shadow min-h-[150px]" style={headerStyle}>
           <div className="flex justify-between items-center pb-2">
-            <p className="text-white font-medium">Canceladas</p>
+            <p className="text-white font-medium">Pendientes</p>
           </div>
-          <div className="text-2xl font-bold text-red-500">
-            {reservas.filter((r) => r.estado === 'cancelada').length}
+          <div className="text-2xl font-bold text-yellow-500">
+            {reservas.filter((r) => r.estado === 'pendiente').length}
           </div>
         </div>
+
 
         <div className="p-4 rounded-lg shadow min-h-[150px]" style={headerStyle}>
           <div className="flex justify-between items-center pb-2">
@@ -288,6 +305,7 @@ export default function AdminReservasPage() {
           <option value="">Todos los estados</option>
           <option value="confirmada">Confirmada</option>
           <option value="cancelada">Cancelada</option>
+          <option value="pendiente">Pendiente</option>
         </select>
 
         <input
@@ -379,7 +397,9 @@ export default function AdminReservasPage() {
                         ? 'bg-red-700'
                         : r.estado === 'cancelada'
                           ? 'bg-red-400'
-                          : 'bg-red-400'
+                        : r.estado === 'pendiente'
+                          ? 'bg-gray-500'
+                          : 'bg-gray-500'
                         }`}>
                         {r.estado ?? "?"}
                       </span>

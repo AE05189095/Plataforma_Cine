@@ -272,14 +272,26 @@ exports.create = async (req, res) => {
       console.error('Error registrando log de compra:', logErr);
     }
 
-    // Crear la reserva en la colección de Reservas
-    await Reservation.create([{
-      userId,
-      showtimeId: showtimeId,
-      seats,
-      totalPrice: totalQ,
-      estado: 'confirmada',
-    }], { session });
+    // --- LÓGICA DE RESERVA ACTUALIZADA ---
+    // En lugar de crear una nueva, buscamos la reserva 'pendiente' y la actualizamos a 'confirmada'.
+    const pendingReservation = await Reservation.findOneAndUpdate(
+      {
+        userId,
+        showtimeId: showtimeId,
+        estado: 'pendiente',
+        // Opcional: verificar que los asientos coincidan para mayor seguridad
+        // seats: { $all: seats, $size: seats.length } 
+      },
+      {
+        $set: {
+          estado: 'confirmada',
+          totalPrice: totalQ,
+          paymentIntentId: paymentInfo.paymentIntentId, // Guardar info del pago
+        },
+        $unset: { expiresAt: "" } // Eliminar el campo de expiración
+      },
+      { session, sort: { createdAt: -1 } } // Si hay varias, toma la más reciente
+    );
 
     await session.commitTransaction();
 

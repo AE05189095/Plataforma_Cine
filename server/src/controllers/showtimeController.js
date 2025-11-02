@@ -4,6 +4,7 @@ const Showtime = require('../models/Showtime');
 const Movie = require('../models/Movie');
 const Hall = require('../models/Hall');
 const SeatLock = require('../models/SeatLock');
+const Reservation = require('../models/Reservation'); // <-- Importar Reservation
 const Log = require('../models/Log');
 
 const LOCK_DURATION_MINUTES = 10;
@@ -177,6 +178,41 @@ exports.lockSeats = async (req, res) => {
     const unavailable = Array.from(new Set([...booked, ...currentlyLockedByOthers]));
     const validSeatsToLock = seatIds.filter(seat => !unavailable.includes(seat));
     const newExpiration = new Date(Date.now() + LOCK_DURATION_MINUTES * 60000);
+
+    // --- INICIO DE LA LÓGICA DE RESERVA PENDIENTE ---
+    // Buscar si ya existe una reserva pendiente para este usuario y función
+    let pendingReservation = await Reservation.findOne({
+      userId: req.user._id,
+      showtimeId: showtime._id,
+      estado: 'pendiente'
+    });
+
+    if (validSeatsToLock.length > 0) {
+      if (pendingReservation) {
+        // Si ya existe, la actualizamos con los nuevos asientos y expiración
+        pendingReservation.seats = validSeatsToLock;
+        pendingReservation.expiresAt = newExpiration;
+        await pendingReservation.save();
+      } else {
+        // Si no existe, creamos una nueva reserva pendiente
+        pendingReservation = new Reservation({
+          userId: req.user._id,
+          showtimeId: showtime._id,
+          seats: validSeatsToLock,
+          totalPrice: 0, // El precio se calcula al confirmar
+          estado: 'pendiente',
+          createdAt: new Date(),
+          expiresAt: newExpiration,
+        });
+        await pendingReservation.save();
+      }
+    } else {
+      // Si el usuario deselecciona todos los asientos, eliminamos la reserva pendiente si existe
+      if (pendingReservation) {
+        await Reservation.findByIdAndDelete(pendingReservation._id);
+      }
+    }
+    // --- FIN DE LA LÓGICA DE RESERVA PENDIENTE ---
 
     if (validSeatsToLock.length > 0) {
       const updated = await Showtime.findOneAndUpdate(
