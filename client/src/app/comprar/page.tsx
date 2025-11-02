@@ -222,11 +222,21 @@ export default function ComprarPage() {
     updateSeatLocks(newSelected);
   }, [selected, updateSeatLocks, expirationTime]);
 
-  const handleExpiration = useCallback(() => {
+  const handleExpiration = useCallback(async () => {
+    // Limpiar selección local
     setSelected([]);
     setExpirationTime(null);
     setToast({ open: true, message: 'Reserva expirada', type: 'info' });
-  }, []);
+    try {
+      // Notificar al servidor para que elimine los locks de este usuario inmediatamente
+      await updateSeatLocks([]);
+      // Refrescar en segundo plano para que el mapa se pinte disponible sin esperar al polling/TTL
+      await fetchShowtime(true);
+    } catch (e) {
+      // Silencioso: en el siguiente polling igual se actualizará
+      console.warn('No se pudo sincronizar limpieza de locks al expirar:', e);
+    }
+  }, [updateSeatLocks, fetchShowtime]);
 
   const handlePurchase = useCallback(() => {
     if (selected.length === 0) {
