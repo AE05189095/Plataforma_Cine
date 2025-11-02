@@ -17,6 +17,7 @@ type Showtime = {
   date: string;
   time: string;
   price?: number;
+  premiumPrice?: number;
   isActive?: boolean;
 };
 
@@ -32,7 +33,7 @@ export default function AdminHorariosPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  const [form, setForm] = useState({ movie: "", hall: "", date: "", time: "", price: "" });
+  const [form, setForm] = useState({ movie: "", hall: "", date: "", time: "", price: "", premiumPrice: "" });
 
   const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
 
@@ -91,7 +92,7 @@ export default function AdminHorariosPage() {
     try {
       const preHall = searchParams ? searchParams.get('hall') : null;
       if (preHall) setForm(prev => ({ ...prev, hall: preHall }));
-    } catch (err) {
+    } catch {
       // ignore
     }
   }, [loadAll, searchParams]);
@@ -127,7 +128,7 @@ export default function AdminHorariosPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ movie: '', hall: '', date: '', time: '', price: '' });
+    setForm({ movie: '', hall: '', date: '', time: '', price: '', premiumPrice: '' });
     setModalOpen(true);
   };
 
@@ -140,7 +141,7 @@ export default function AdminHorariosPage() {
     // usar representación en zona local adecuada para inputs (YYYY-MM-DD, HH:MM)
     const isoDate = dt.toLocaleDateString('en-CA'); // -> 2025-12-25
     const isoTime = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // -> 14:30
-    setForm({ movie: movieId || '', hall: hallId || '', date: isoDate, time: isoTime, price: String(st.price || '') });
+    setForm({ movie: movieId || '', hall: hallId || '', date: isoDate, time: isoTime, price: String(st.price || ''), premiumPrice: String(st.premiumPrice || '') });
     setModalOpen(true);
   };
 
@@ -179,7 +180,7 @@ export default function AdminHorariosPage() {
         if (st.endAt) sEnd = new Date(st.endAt);
         else {
           const stMovie = typeof st.movie === 'string' ? movies.find(m => m._id === st.movie) : st.movie;
-          const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stMovie.duration : DEFAULT_DURATION_MIN;
+          const stDur = stMovie && typeof stMovie.duration === 'number' && stMovie.duration > 0 ? stDur : DEFAULT_DURATION_MIN;
           sEnd = new Date(sStart.getTime() + stDur * 60000);
         }
         if (overlapsFn(startAtDate, endAtDate, sStart, sEnd)) {
@@ -191,7 +192,8 @@ export default function AdminHorariosPage() {
         }
       }
 
-      const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0 };
+      // 💥 CONFLICTO RESUELTO: Aceptamos premiumPrice del hotfix
+      const body = { movie: form.movie, hall: form.hall, startAt, price: form.price ? Number(form.price) : 0, premiumPrice: form.premiumPrice ? Number(form.premiumPrice) : 0 };
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -266,37 +268,39 @@ export default function AdminHorariosPage() {
               <th className="px-4 py-3">Hora</th>
               <th className="px-4 py-3">Sala</th>
               <th className="px-4 py-3">Precio</th>
+              <th className="px-4 py-3">Precio Premium</th>
               <th className="px-4 py-3">Acciones</th>
             </tr>
           </thead>
           <tbody style={{ color: 'rgba(255,255,255,0.9)' }}>
               {loading && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center">Cargando...</td></tr>
-            )}
-            {!loading && showtimes.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-6 text-center">No hay funciones definidas</td></tr>
-            )}
-            {!loading && showtimes.map((st) => {
-              const movie = typeof st.movie === 'string' ? null : (st.movie as Movie);
-              const hall = typeof st.hall === 'string' ? null : (st.hall as Hall);
-              const dt = new Date(st.startAt);
-              // Mostrar fecha/hora en zona local (evitar confusión con toISOString que usa UTC)
-              const dateStr = dt.toLocaleDateString('en-CA');
-              const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-              return (
-                <tr key={st._id} className="border-t border-gray-800">
-                  <td className="px-4 py-3">{movie?.title || '—'}</td>
-                  <td className="px-4 py-3">{dateStr}</td>
-                  <td className="px-4 py-3">{timeStr}</td>
-                  <td className="px-4 py-3">{hall?.name || '—'}</td>
-                  <td className="px-4 py-3">{formatPrice(st.price)}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => openEdit(st)} className="mr-3 text-sm px-2 py-1 rounded btn-primary">Editar</button>
-                    <button onClick={() => handleDelete(st._id)} className="text-sm" style={{ color: '#ff6b6b' }}>Eliminar</button>
-                  </td>
-                </tr>
-              );
-            })}
+              <tr><td colSpan={7} className="px-4 py-6 text-center">Cargando...</td></tr>
+              )}
+              {!loading && showtimes.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-6 text-center">No hay funciones definidas</td></tr>
+              )}
+              {!loading && showtimes.map((st) => {
+                const movie = typeof st.movie === 'string' ? null : (st.movie as Movie);
+                const hall = typeof st.hall === 'string' ? null : (st.hall as Hall);
+                const dt = new Date(st.startAt);
+                // Mostrar fecha/hora en zona local (evitar confusión con toISOString que usa UTC)
+                const dateStr = dt.toLocaleDateString('en-CA');
+                const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <tr key={st._id} className="border-t border-gray-800">
+                    <td className="px-4 py-3">{movie?.title || '—'}</td>
+                    <td className="px-4 py-3">{dateStr}</td>
+                    <td className="px-4 py-3">{timeStr}</td>
+                    <td className="px-4 py-3">{hall?.name || '—'}</td>
+                    <td className="px-4 py-3">{formatPrice(st.price)}</td>
+                    <td className="px-4 py-3">{formatPrice(typeof st.premiumPrice === 'number' ? st.premiumPrice : 0)}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEdit(st)} className="mr-3 text-sm px-2 py-1 rounded btn-primary">Editar</button>
+                      <button onClick={() => handleDelete(st._id)} className="text-sm" style={{ color: '#ff6b6b' }}>Eliminar</button>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
@@ -328,10 +332,16 @@ export default function AdminHorariosPage() {
               </label>
             </div>
 
-            <label className="block mt-3">
-              <div className="text-sm mb-1 text-gray-400">Precio</div>
-              <input type="number" min={0} value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="w-40 p-2 rounded bg-gray-800 text-white border border-gray-600" />
-            </label>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block">
+                <div className="text-sm mb-1 text-gray-400">Precio</div>
+                <input type="number" min={0} step="0.01" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" />
+              </label>
+              <label className="block">
+                <div className="text-sm mb-1 text-gray-400">Precio Premium</div>
+                <input type="number" min={0} step="0.01" value={form.premiumPrice} onChange={e => setForm({ ...form, premiumPrice: e.target.value })} className="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" />
+              </label>
+            </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Cancelar</button>
