@@ -178,14 +178,35 @@ exports.create = async (req, res) => {
         });
       }
 
-      // 2. Actualizar showtime si los asientos están libres
+      // 2. Verificar que no estén bloqueados temporalmente por otro usuario
+      try {
+        const now = new Date();
+        const locks = await SeatLock.find({
+          showtimeId: showtimeId,
+          seatId: { $in: seats },
+          expiresAt: { $gt: now },
+          userId: { $ne: userId },
+        }).lean();
+        if (locks && locks.length > 0) {
+          const conflictSeats = Array.from(new Set(locks.map(l => l.seatId)));
+          await session.abortTransaction();
+          return res.status(409).json({
+            message: `Los siguientes asientos están reservados temporalmente por otro usuario: ${conflictSeats.join(', ')}`,
+            seats: conflictSeats,
+          });
+        }
+      } catch (lkErr) {
+        console.error('Error verificando SeatLock antes de reservar:', lkErr);
+      }
+
+      // 3. Actualizar showtime si los asientos están libres
       await Showtime.findByIdAndUpdate(
         showtimeId,
         { $push: { seatsBooked: { $each: seats } } },
         { session }
       );
 
-      // 3. Obtener el showtime actualizado para el resto de la lógica
+      // 4. Obtener el showtime actualizado para el resto de la lógica
       showtime = await Showtime.findById(showtimeId)
         .populate('movie')
         .populate('hall')
@@ -380,7 +401,7 @@ exports.cancel = async (req, res) => {
 
     // Eliminar SeatLock asociados a esta compra (liberar registro en collection SeatLock)
     try {
-      await SeatLock.deleteMany({ showtime: purchase.showtime, seatId: { $in: purchase.seats } });
+      await SeatLock.deleteMany({ showtimeId: purchase.showtime, seatId: { $in: purchase.seats } });
     } catch (delErr) {
       console.error('Error eliminando SeatLock al cancelar compra:', delErr);
     }

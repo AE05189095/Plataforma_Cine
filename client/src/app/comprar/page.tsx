@@ -23,19 +23,7 @@ interface ShowtimeResponse {
   price?: number;
 }
 
-interface PaymentPayload {
-  method: 'card' | 'paypal';
-  card?: {
-    number: string;
-    name: string;
-    expMonth: string;
-    expYear: string;
-    cvv: string;
-  };
-  paypal?: {
-    email: string;
-  };
-}
+// (interfaz de pago eliminada por no usarse)
 
 const MAX_SEATS = 10;
 
@@ -59,10 +47,10 @@ export default function ComprarPage() {
   // =============================
   // FETCH SHOWTIME
   // =============================
-  const fetchShowtime = useCallback(async () => {
+  const fetchShowtime = useCallback(async (isBackground: boolean = false) => {
     if (!showtimeId) return;
 
-    setLoading(true);
+    if (!isBackground) setLoading(true);
     try {
       const token = localStorage.getItem(TOKEN_KEY);
 
@@ -81,7 +69,7 @@ export default function ComprarPage() {
         setShowtime(simulated);
         setOccupied(simulated.seatsBooked ?? []);
         setReserved(simulated.seatsLocked ?? []);
-        setLoading(false);
+        if (!isBackground) setLoading(false);
         return;
       }
 
@@ -105,10 +93,12 @@ export default function ComprarPage() {
 
     } catch (err) {
       console.error('Error fetching showtime:', err);
-      setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
-      setShowtime(null);
+      if (!isBackground) {
+        setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
+        setShowtime(null);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }, [showtimeId]);
 
@@ -118,6 +108,38 @@ export default function ComprarPage() {
   useEffect(() => {
     if (!showtimeId) return;
     fetchShowtime();
+  }, [showtimeId, fetchShowtime]);
+
+  // Refresco periódico: mantener asientos bloqueados/ocupados sincronizados sin sockets (gratuito)
+  useEffect(() => {
+    if (!showtimeId) return;
+  let timer: number | undefined;
+
+    const startPolling = () => {
+      // pequeño jitter para evitar sincronización de múltiples clientes
+      const initialDelay = 500 + Math.floor(Math.random() * 1500);
+      // primer refresh en segundo plano
+  const first = window.setTimeout(() => fetchShowtime(true), initialDelay);
+  // intervalo más largo para no gatillar rate limit (100 req/15min => ~cada 15s)
+  timer = window.setInterval(() => fetchShowtime(true), 15000) as unknown as number;
+  return () => { window.clearTimeout(first); if (timer !== undefined) window.clearInterval(timer); };
+    };
+
+  const cleanup = startPolling();
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        if (timer !== undefined) window.clearInterval(timer);
+      } else if (document.visibilityState === 'visible') {
+        if (timer !== undefined) window.clearInterval(timer);
+        cleanup();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      if (cleanup) cleanup();
+    };
   }, [showtimeId, fetchShowtime]);
 
   // =============================
@@ -133,7 +155,7 @@ export default function ComprarPage() {
     const token = localStorage.getItem(TOKEN_KEY);
 
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/showtimes/${showtime._id}/lock-seats`, { 
+      const res = await fetch(`${API_BASE}/api/showtimes/${showtime._id}/lock-seats`, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,6 +295,12 @@ export default function ComprarPage() {
             onCancel={() => setPaymentModal(null)}
             showtimeId={showtimeId || ''}
             seatsSelected={paymentModal.seats.map(s => s.id)}
+            onConflict={(conflictSeats, message) => {
+              setToast({ open: true, message: message || 'Estos asientos ya están reservados', type: 'error' });
+              setSelected(prev => prev.filter(s => !conflictSeats.includes(s.id)));
+              fetchShowtime();
+              setPaymentModal(null);
+            }}
           />
         )}
 

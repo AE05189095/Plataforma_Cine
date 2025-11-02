@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { formatCurrency } from '@/lib/format';
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { API_BASE, TOKEN_KEY } from '@/lib/config';
@@ -11,13 +11,14 @@ type Props = {
   onCancel: () => void;
   showtimeId: string;
   seatsSelected?: string[];
+  onConflict?: (conflictSeats: string[], message?: string) => void;
 };
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
 
-function PaymentForm({ amount, onCancel, showtimeId, seatsSelected }: Props) {
+function PaymentForm({ amount, onCancel, showtimeId, seatsSelected, onConflict }: Props) {
   const [cardName, setCardName] = useState('');
   const [loading, setLoading] = useState(false);
   const [method, setMethod] = useState<'card'|'paypal'>('card');
@@ -92,7 +93,16 @@ function PaymentForm({ amount, onCancel, showtimeId, seatsSelected }: Props) {
 
       if (!purchaseRes.ok) {
         const purchaseError = await purchaseRes.json().catch(() => ({ message: 'Error creando el registro de la compra.' }));
-        throw new Error(purchaseError.message || 'Error creando el registro de la compra.');
+        const message = purchaseError.message || 'Error creando el registro de la compra.';
+        // Si es conflicto por asientos bloqueados/ocupados, notificar al mapa y cerrar modal
+        if (purchaseRes.status === 409 && onConflict) {
+          try {
+            onConflict(seatsSelected || [], message);
+          } catch {}
+          onCancel();
+          return;
+        }
+        throw new Error(message);
       }
 
       const purchaseData = await purchaseRes.json();
