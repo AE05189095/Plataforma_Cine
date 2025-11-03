@@ -185,10 +185,23 @@ export default function AdminReservasPage() {
           const coincideUser = !user || r.userId?.email?.toLowerCase().includes(user.toLowerCase());
           const coincideMovie = !movie || r.showtimeId?.movie?.title === movie; // Comparación exacta para el select
           const coincideEstado = !estado || r.estado === estado;
-          const coincideFecha = !date || (
-            r.showtimeId?.startAt &&
-            new Date(r.showtimeId.startAt).toISOString().startsWith(date)
-          );
+
+          // 💡 LÓGICA DE FECHA CORREGIDA
+          const coincideFecha = (() => {
+            if (!date) return true; // Si no hay filtro de fecha, coincide
+            if (!r.showtimeId?.startAt) return false; // Si la reserva no tiene fecha, no coincide
+
+            // Convertir la fecha del filtro (YYYY-MM-DD) a un objeto Date en UTC para evitar corrimientos de día.
+            const fechaFiltro = new Date(`${date}T00:00:00Z`);
+            // Convertir la fecha de la reserva a un objeto Date.
+            const fechaReserva = new Date(r.showtimeId.startAt);
+
+            // Comparar año, mes y día en la zona horaria local del usuario.
+            return fechaReserva.getFullYear() === fechaFiltro.getUTCFullYear() &&
+                   fechaReserva.getMonth() === fechaFiltro.getUTCMonth() &&
+                   fechaReserva.getDate() === fechaFiltro.getUTCDate();
+          })();
+
           return coincideId && coincideUser && coincideMovie && coincideEstado && coincideFecha;
         });
 
