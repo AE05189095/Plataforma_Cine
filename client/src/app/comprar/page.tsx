@@ -244,39 +244,48 @@ export default function ComprarPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
         <Header />
-        <main className="p-8">
-          <div className="max-w-6xl mx-auto">
-            <h1 className="text-2xl font-bold text-amber-300 mb-2">Selecciona tus asientos</h1>
+        
+                    <main className="min-h-screen w-full overflow-x-hidden p-4 sm:p-6 md:p-8 bg-black text-white">
+          <div className="max-w-6xl mx-auto w-full">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-300 mb-4 text-center sm:text-left">
+              Selecciona tus asientos
+            </h1>
 
             {loading ? (
-              <div className="text-slate-400 mb-4">Cargando información de la función...</div>
+              <div className="text-slate-400 mb-4 text-center sm:text-left">
+                Cargando información de la función...
+              </div>
             ) : showtime ? (
-              <div className="text-slate-400 mb-4 text-left">
-                Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —
-                Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —
-                Precio: <span className="text-white font-semibold">
+              <div className="text-slate-400 mb-4 text-center sm:text-left text-sm sm:text-base">
+                Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —{" "}
+                Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —{" "}
+                Precio:{" "}
+                <span className="text-white font-semibold">
                   {typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0
                     ? `${formatCurrency(showtime.price ?? getPriceForHall(showtime?.hall?.name))} (Reg) / ${formatCurrency(showtime.premiumPrice)} (Prem)`
-                    : formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))
-                  }
+                    : formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))}
                 </span>
               </div>
             ) : (
-              <div className="text-red-400 mb-4">Error al cargar la función</div>
+              <div className="text-red-400 mb-4 text-center sm:text-left">Error al cargar la función</div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <div className="lg:col-span-2 flex justify-center">
-                <SeatMap
-                  occupiedSeats={occupied}
-                  reservedSeats={reserved}
-                  selectedSeats={selected.map(s => s.id)}
-                  currentSelectedObjects={selected}
-                  onSelectionChange={handleSelectionChange}
-                />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start w-full">
+              {/* Mapa de asientos */}
+              <div className="lg:col-span-2 flex justify-center w-full">
+                <div className="w-full overflow-x-auto px-2">
+                  <SeatMap
+                    occupiedSeats={occupied}
+                    reservedSeats={reserved}
+                    selectedSeats={selected.map(s => s.id)}
+                    currentSelectedObjects={selected}
+                    onSelectionChange={handleSelectionChange}
+                  />
+                </div>
               </div>
 
-              <div className="lg:col-span-1 flex justify-center">
+              {/* Resumen de reserva */}
+              <div className="lg:col-span-1 flex justify-center w-full">
                 <ReservationSummary
                   seats={selected}
                   expirationTime={expirationTime}
@@ -289,6 +298,8 @@ export default function ComprarPage() {
             </div>
           </div>
         </main>
+
+
 
         {paymentModal?.open && (
           <PaymentMethods
