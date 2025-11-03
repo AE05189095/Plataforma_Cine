@@ -21,21 +21,10 @@ interface ShowtimeResponse {
   startAt?: string;
   hall?: { name?: string };
   price?: number;
+  premiumPrice?: number;
 }
 
-interface PaymentPayload {
-  method: 'card' | 'paypal';
-  card?: {
-    number: string;
-    name: string;
-    expMonth: string;
-    expYear: string;
-    cvv: string;
-  };
-  paypal?: {
-    email: string;
-  };
-}
+// (interfaz de pago eliminada por no usarse)
 
 const MAX_SEATS = 10;
 
@@ -51,18 +40,18 @@ export default function ComprarPage() {
   const [paymentModal, setPaymentModal] = useState<{ open: boolean; seats: Seat[]; total: number } | null>(null);
   const [showtime, setShowtime] = useState<ShowtimeResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<{ open: boolean; message: string; type?: 'success' | 'error' | 'info' }>({ 
-    open: false, 
-    message: '' 
+  const [toast, setToast] = useState<{ open: boolean; message: string; type?: 'success' | 'error' | 'info' }>({
+    open: false,
+    message: ''
   });
 
   // =============================
   // FETCH SHOWTIME
   // =============================
-  const fetchShowtime = useCallback(async () => {
+  const fetchShowtime = useCallback(async (isBackground: boolean = false) => {
     if (!showtimeId) return;
 
-    setLoading(true);
+    if (!isBackground) setLoading(true);
     try {
       const token = localStorage.getItem(TOKEN_KEY);
 
@@ -81,13 +70,13 @@ export default function ComprarPage() {
         setShowtime(simulated);
         setOccupied(simulated.seatsBooked ?? []);
         setReserved(simulated.seatsLocked ?? []);
-        setLoading(false);
+        if (!isBackground) setLoading(false);
         return;
       }
 
       // Fetch real desde backend
-      const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}`, { 
-        headers: { 
+      const res = await fetch(`${API_BASE}/api/showtimes/${showtimeId}`, {
+        headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
@@ -105,10 +94,12 @@ export default function ComprarPage() {
 
     } catch (err) {
       console.error('Error fetching showtime:', err);
-      setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
-      setShowtime(null);
+      if (!isBackground) {
+        setToast({ open: true, message: 'Error al cargar la información de la función', type: 'error' });
+        setShowtime(null);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }, [showtimeId]);
 
@@ -120,20 +111,48 @@ export default function ComprarPage() {
     fetchShowtime();
   }, [showtimeId, fetchShowtime]);
 
+  // Refresco periódico
+  useEffect(() => {
+    if (!showtimeId) return;
+    let timer: number | undefined;
+
+    const startPolling = () => {
+      const initialDelay = 500 + Math.floor(Math.random() * 1500);
+      const first = window.setTimeout(() => fetchShowtime(true), initialDelay);
+      timer = window.setInterval(() => fetchShowtime(true), 15000) as unknown as number;
+      return () => { window.clearTimeout(first); if (timer !== undefined) window.clearInterval(timer); };
+    };
+
+    const cleanup = startPolling();
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        if (timer !== undefined) window.clearInterval(timer);
+      } else if (document.visibilityState === 'visible') {
+        if (timer !== undefined) window.clearInterval(timer);
+        cleanup();
+      }
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      if (cleanup) cleanup();
+    };
+  }, [showtimeId, fetchShowtime]);
+
   // =============================
   // LOCK SEATS
   // =============================
   const updateSeatLocks = useCallback(async (seatsToLock: Seat[]) => {
     if (!showtimeId || !showtime) return;
 
-    // ignoramos simulados
     if (showtimeId.includes("-gen-")) return;
 
     const seatIds = seatsToLock.map(s => s.id);
     const token = localStorage.getItem(TOKEN_KEY);
 
     try {
-      const res = await fetch(`${API_BASE}/api/purchases/showtimes/${showtime._id}/lock-seats`, { 
+      const res = await fetch(`${API_BASE}/api/showtimes/${showtime._id}/lock-seats`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,10 +163,7 @@ export default function ComprarPage() {
 
       if (!res.ok) {
         if (res.status === 401) { router.push('/login'); return; }
-        if (res.status === 404) {
-          setSelected(seatsToLock);
-          return;
-        }
+        if (res.status === 404) { setSelected(seatsToLock); return; }
         throw new Error(`Error ${res.status} al actualizar reserva`);
       }
 
@@ -162,11 +178,7 @@ export default function ComprarPage() {
         setExpirationTime(tenMinutesLater);
       }
 
-  // Don't overwrite local selection immediately with server response.
-  // Keep client-managed `selected` so users can freely select/deselect while locks
-  // are being synchronized. We still update `reserved` and `expirationTime`.
-
-    } catch (error) { 
+    } catch (error) {
       console.error('Error updating seat locks:', error);
       setSelected(seatsToLock);
     }
@@ -200,11 +212,17 @@ export default function ComprarPage() {
     updateSeatLocks(newSelected);
   }, [selected, updateSeatLocks, expirationTime]);
 
-  const handleExpiration = useCallback(() => {
+  const handleExpiration = useCallback(async () => {
     setSelected([]);
     setExpirationTime(null);
     setToast({ open: true, message: 'Reserva expirada', type: 'info' });
-  }, []);
+    try {
+      await updateSeatLocks([]);
+      await fetchShowtime(true);
+    } catch (e) {
+      console.warn('No se pudo sincronizar limpieza de locks al expirar:', e);
+    }
+  }, [updateSeatLocks, fetchShowtime]);
 
   const handlePurchase = useCallback(() => {
     if (selected.length === 0) {
@@ -233,10 +251,15 @@ export default function ComprarPage() {
             {loading ? (
               <div className="text-slate-400 mb-4">Cargando información de la función...</div>
             ) : showtime ? (
-              <div className="text-slate-400 mb-4">
+              <div className="text-slate-400 mb-4 text-left">
                 Película: <span className="text-white font-semibold">{showtime.movie?.title || '—'}</span> —
                 Sala: <span className="text-white font-semibold">{showtime.hall?.name || '—'}</span> —
-                Precio: <span className="text-white font-semibold">{formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))}</span>
+                Precio: <span className="text-white font-semibold">
+                  {typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0
+                    ? `${formatCurrency(showtime.price ?? getPriceForHall(showtime?.hall?.name))} (Reg) / ${formatCurrency(showtime.premiumPrice)} (Prem)`
+                    : formatCurrency(typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name))
+                  }
+                </span>
               </div>
             ) : (
               <div className="text-red-400 mb-4">Error al cargar la función</div>
@@ -256,11 +279,11 @@ export default function ComprarPage() {
               <div className="lg:col-span-1 flex justify-center">
                 <ReservationSummary
                   seats={selected}
-                  showtimeId={showtimeId}
                   expirationTime={expirationTime}
                   onExpiration={handleExpiration}
                   onPurchase={handlePurchase}
-                  perSeatPrice={typeof showtime?.price === 'number' ? showtime.price : null}
+                  regularPrice={typeof showtime?.price === 'number' ? showtime.price : null}
+                  premiumPrice={typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0 ? showtime.premiumPrice : null}
                 />
               </div>
             </div>
@@ -273,6 +296,12 @@ export default function ComprarPage() {
             onCancel={() => setPaymentModal(null)}
             showtimeId={showtimeId || ''}
             seatsSelected={paymentModal.seats.map(s => s.id)}
+            onConflict={(conflictSeats, message) => {
+              setToast({ open: true, message: message || 'Estos asientos ya están reservados', type: 'error' });
+              setSelected(prev => prev.filter(s => !conflictSeats.includes(s.id)));
+              fetchShowtime();
+              setPaymentModal(null);
+            }}
           />
         )}
 

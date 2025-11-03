@@ -4,6 +4,8 @@ const Showtime = require('../models/Showtime');
 const Movie = require('../models/Movie');
 const Hall = require('../models/Hall');
 const SeatLock = require('../models/SeatLock');
+const Reservation = require('../models/Reservation'); // <-- Importar Reservation
+const Log = require('../models/Log');
 
 const LOCK_DURATION_MINUTES = 10;
 const CLEANUP_INTERVAL_MS = 30 * 1000; // cada 30 segundos limpiar locks expirados
@@ -177,6 +179,41 @@ exports.lockSeats = async (req, res) => {
     const validSeatsToLock = seatIds.filter(seat => !unavailable.includes(seat));
     const newExpiration = new Date(Date.now() + LOCK_DURATION_MINUTES * 60000);
 
+    // --- INICIO DE LA LÓGICA DE RESERVA PENDIENTE ---
+    // Buscar si ya existe una reserva pendiente para este usuario y función
+    let pendingReservation = await Reservation.findOne({
+      userId: req.user._id,
+      showtimeId: showtime._id,
+      estado: 'pendiente'
+    });
+
+    if (validSeatsToLock.length > 0) {
+      if (pendingReservation) {
+        // Si ya existe, la actualizamos con los nuevos asientos y expiración
+        pendingReservation.seats = validSeatsToLock;
+        pendingReservation.expiresAt = newExpiration;
+        await pendingReservation.save();
+      } else {
+        // Si no existe, creamos una nueva reserva pendiente
+        pendingReservation = new Reservation({
+          userId: req.user._id,
+          showtimeId: showtime._id,
+          seats: validSeatsToLock,
+          totalPrice: 0, // El precio se calcula al confirmar
+          estado: 'pendiente',
+          createdAt: new Date(),
+          expiresAt: newExpiration,
+        });
+        await pendingReservation.save();
+      }
+    } else {
+      // Si el usuario deselecciona todos los asientos, eliminamos la reserva pendiente si existe
+      if (pendingReservation) {
+        await Reservation.findByIdAndDelete(pendingReservation._id);
+      }
+    }
+    // --- FIN DE LA LÓGICA DE RESERVA PENDIENTE ---
+
     if (validSeatsToLock.length > 0) {
       const updated = await Showtime.findOneAndUpdate(
         { _id: showtime._id, 'seatsLocks.userId': req.user._id },
@@ -302,7 +339,7 @@ exports.create = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
 
-    const { movie: movieId, hall: hallId, startAt: startAtRaw, price } = req.body;
+  const { movie: movieId, hall: hallId, startAt: startAtRaw, price, premiumPrice } = req.body;
     if (!movieId || !hallId || !startAtRaw) return res.status(400).json({ message: 'movie, hall y startAt son requeridos' });
 
     const movie = await Movie.findById(movieId);
@@ -338,12 +375,25 @@ exports.create = async (req, res) => {
       date: toYMD(startAt),
       time: toHHmm(startAt),
       price: typeof price === 'number' ? price : 0,
+      premiumPrice: typeof premiumPrice === 'number' ? premiumPrice : 0,
       capacity: typeof hall.capacity === 'number' ? hall.capacity : undefined,
       isActive: true,
     });
 
     await doc.save();
     const populated = await Showtime.findById(doc._id).populate('movie').populate('hall').lean();
+    //log creacion de horario
+    try {
+    await Log.create({
+    usuario: req.user?._id,
+    role: 'admin',
+    accion: 'creacion',
+    descripcion: `El administrador ${req.user?.username || 'desconocido'} creó un horario para la película "${populated.movie?.title || 'desconocida'}" en la sala "${populated.hall?.name || 'sin nombre'}" el ${toYMD(populated.startAt)} a las ${toHHmm(populated.startAt)}.`,
+      });
+    } catch (logErr) {
+    console.error('Error registrando log de creación de horario:', logErr);
+    }
+
     // Emitir evento a clientes conectados para actualizar UIs en tiempo real
     try {
       const io = (require('../../index').io) || (req.app && req.app.locals && req.app.locals.io);
@@ -408,11 +458,24 @@ exports.update = async (req, res) => {
     existing.endAt = endAt;
     existing.date = toYMD(startAt);
     existing.time = toHHmm(startAt);
-    if (typeof payload.price === 'number') existing.price = payload.price;
+  if (typeof payload.price === 'number') existing.price = payload.price;
+  if (typeof payload.premiumPrice === 'number') existing.premiumPrice = payload.premiumPrice;
     if (typeof payload.isActive === 'boolean') existing.isActive = payload.isActive;
 
     await existing.save();
     const populated = await Showtime.findById(existing._id).populate('movie').populate('hall').lean();
+    //log modificacion de horario
+    try {
+    await Log.create({
+      usuario: req.user?._id,
+      role: 'admin',
+      accion: 'modificacion',
+      descripcion: `El administrador ${req.user?.username || 'desconocido'} modificó el horario de la película "${populated.movie?.title || 'desconocida'}" en la sala "${populated.hall?.name || 'sin nombre'}" (${toYMD(populated.startAt)} ${toHHmm(populated.startAt)}).`,
+      });
+    } catch (logErr) {
+    console.error('Error registrando log de modificación de horario:', logErr);
+    }
+
     try {
       const io = (require('../../index').io) || (req.app && req.app.locals && req.app.locals.io);
       if (io) io.emit('showtimeUpdated', populated);
@@ -433,11 +496,22 @@ exports.remove = async (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ message: 'ID es requerido' });
 
-    const existing = await Showtime.findById(id);
+    const existing = await Showtime.findById(id).populate('movie');
     if (!existing) return res.status(404).json({ message: 'Función no encontrada' });
 
     existing.isActive = false;
     await existing.save();
+    //log eliminacion de horario
+    try {
+    await Log.create({
+    usuario: req.user?._id,
+    role: 'admin',
+    accion: 'eliminacion',
+    descripcion: `El administrador ${req.user?.username || 'desconocido'} eliminó (desactivó) el horario de la película "${existing.movie?.title || 'desconocida'}".`,
+    });
+    } catch (logErr) {
+    console.error('Error registrando log de eliminación de horario:', logErr);
+    }
     try {
       const io = (require('../../index').io) || (req.app && req.app.locals && req.app.locals.io);
       if (io) io.emit('showtimeRemoved', { id: existing._id.toString() });
