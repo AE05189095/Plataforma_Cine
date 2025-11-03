@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import ProtectedRoute from "@/components/Protectedroute";
@@ -45,11 +45,37 @@ export default function ComprarPage() {
     message: ''
   });
 
+  // Control de llamadas para evitar ráfagas y duplicados (React Strict Mode)
+  const inFlightRef = useRef<boolean>(false);
+  const lastFetchAtRef = useRef<number>(0);
+  const backoffAttemptRef = useRef<number>(0);
+  const pausedUntilRef = useRef<number>(0);
+  const backoffTimerRef = useRef<number | null>(null);
+
   // =============================
   // FETCH SHOWTIME
   // =============================
   const fetchShowtime = useCallback(async (isBackground: boolean = false) => {
     if (!showtimeId) return;
+
+    // Respetar pausas por rate limit
+    const now = Date.now();
+    if (pausedUntilRef.current && now < pausedUntilRef.current) {
+      // Ya hay una pausa activa; evitar más solicitudes
+      return;
+    }
+
+    // Evitar duplicados cercanos (doble render de StrictMode / overlaps)
+    if (inFlightRef.current) {
+      return;
+    }
+    const sinceLast = now - lastFetchAtRef.current;
+    if (sinceLast < 500) {
+      // Anti-rafaga: si la última llamada fue hace <500ms, saltamos
+      return;
+    }
+    inFlightRef.current = true;
+    lastFetchAtRef.current = now;
 
     if (!isBackground) setLoading(true);
     try {
@@ -83,6 +109,36 @@ export default function ComprarPage() {
       });
 
       if (!res.ok) {
+        // Manejo especial de 429 (rate limit)
+        if (res.status === 429) {
+          const retryAfterHeader = res.headers.get('Retry-After');
+          // Si el servidor pasa segundos en Retry-After, usarlo; si no, exponencial con jitter
+          let waitMs = retryAfterHeader ? Math.max(1000, Number(retryAfterHeader) * 1000) : 0;
+          if (!waitMs || Number.isNaN(waitMs)) {
+            const attempt = Math.min(5, backoffAttemptRef.current + 1);
+            waitMs = Math.min(30000, 750 * Math.pow(2, attempt)) + Math.floor(Math.random() * 200);
+            backoffAttemptRef.current = attempt;
+          } else {
+            backoffAttemptRef.current = Math.min(5, backoffAttemptRef.current + 1);
+          }
+          pausedUntilRef.current = Date.now() + waitMs;
+          // Informar sólo si no es background para no saturar toast
+          if (!isBackground) {
+            setToast({ open: true, message: 'Muchas solicitudes. Reintentando automáticamente…', type: 'info' });
+          }
+          // Programar un reintento único si no hay ya un timer
+          if (backoffTimerRef.current) {
+            window.clearTimeout(backoffTimerRef.current);
+          }
+          backoffTimerRef.current = window.setTimeout(() => {
+            backoffTimerRef.current = null;
+            // Llamada en background para actualizar cuando termine la pausa
+            fetchShowtime(true);
+          }, waitMs) as unknown as number;
+
+          return;
+        }
+
         const errMsg = await res.json().then(r => r.message).catch(() => 'No se pudo cargar la función');
         throw new Error(`Error ${res.status}: ${errMsg}`);
       }
@@ -91,6 +147,9 @@ export default function ComprarPage() {
       setShowtime(data);
       setOccupied(data.seatsBooked ?? []);
       setReserved(data.seatsLocked ?? []);
+      // Resetear backoff al tener éxito
+      backoffAttemptRef.current = 0;
+      pausedUntilRef.current = 0;
 
     } catch (err) {
       console.error('Error fetching showtime:', err);
@@ -99,6 +158,7 @@ export default function ComprarPage() {
         setShowtime(null);
       }
     } finally {
+      inFlightRef.current = false;
       if (!isBackground) setLoading(false);
     }
   }, [showtimeId]);
@@ -109,34 +169,52 @@ export default function ComprarPage() {
   useEffect(() => {
     if (!showtimeId) return;
     fetchShowtime();
+    return () => {
+      // limpiar cualquier timer pendiente de backoff si desmonta
+      if (backoffTimerRef.current) {
+        window.clearTimeout(backoffTimerRef.current);
+        backoffTimerRef.current = null;
+      }
+    };
   }, [showtimeId, fetchShowtime]);
 
   // Refresco periódico
   useEffect(() => {
     if (!showtimeId) return;
-    let timer: number | undefined;
+    let pollTimer: number | undefined;
+    let initialTimer: number | undefined;
+
+    const tick = () => {
+      // No poll si estamos en pausa por 429
+      if (pausedUntilRef.current && Date.now() < pausedUntilRef.current) return;
+      fetchShowtime(true);
+    };
 
     const startPolling = () => {
       const initialDelay = 500 + Math.floor(Math.random() * 1500);
-      const first = window.setTimeout(() => fetchShowtime(true), initialDelay);
-      timer = window.setInterval(() => fetchShowtime(true), 15000) as unknown as number;
-      return () => { window.clearTimeout(first); if (timer !== undefined) window.clearInterval(timer); };
+      initialTimer = window.setTimeout(tick, initialDelay) as unknown as number;
+      // Intervalo un poco mayor para aliviar rate limit cuando hay varias pestañas
+      pollTimer = window.setInterval(tick, 20000) as unknown as number;
     };
 
-    const cleanup = startPolling();
+    startPolling();
+
     const onVis = () => {
       if (document.visibilityState === 'hidden') {
-        if (timer !== undefined) window.clearInterval(timer);
+        if (pollTimer !== undefined) window.clearInterval(pollTimer);
+        if (initialTimer !== undefined) window.clearTimeout(initialTimer);
       } else if (document.visibilityState === 'visible') {
-        if (timer !== undefined) window.clearInterval(timer);
-        cleanup();
+        if (pollTimer !== undefined) window.clearInterval(pollTimer);
+        if (initialTimer !== undefined) window.clearTimeout(initialTimer);
+        startPolling();
       }
     };
     document.addEventListener('visibilitychange', onVis);
 
     return () => {
       document.removeEventListener('visibilitychange', onVis);
-      if (cleanup) cleanup();
+      if (pollTimer !== undefined) window.clearInterval(pollTimer);
+      if (initialTimer !== undefined) window.clearTimeout(initialTimer);
     };
   }, [showtimeId, fetchShowtime]);
 
