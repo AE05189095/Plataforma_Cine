@@ -23,7 +23,6 @@ interface Reserva {
 }
 
 interface Filtros {
-  user: string;
   date: string;
   movie: string;
   estado: string;
@@ -38,7 +37,6 @@ export default function AdminReservasPage() {
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [filtros, setFiltros] = useState<Filtros>({
-    id: '',
     user: '',
     date: '',
     movie: '',
@@ -178,11 +176,12 @@ export default function AdminReservasPage() {
       const filtradas = data
         .filter(r => !r.test) // Primero, excluir todas las reservas de prueba
         .filter((r) => {
-          const { user, date, movie, estado, id } = filtrosActivos;
+          const { user, date, movie, estado } = filtrosActivos;
 
           // Comprobaciones más concisas. Si el filtro está vacío, la condición es verdadera.
-          const coincideId = !id || r._id?.toLowerCase().includes(id.toLowerCase());
-          const coincideUser = !user || r.userId?.email?.toLowerCase().includes(user.toLowerCase());
+          const coincideUser = !user || 
+            r.userId?.email?.toLowerCase().includes(user.toLowerCase()) || 
+            r._id?.toLowerCase().includes(user.toLowerCase());
           const coincideMovie = !movie || r.showtimeId?.movie?.title === movie; // Comparación exacta para el select
           const coincideEstado = !estado || r.estado === estado;
 
@@ -202,7 +201,7 @@ export default function AdminReservasPage() {
                    fechaReserva.getDate() === fechaFiltro.getUTCDate();
           })();
 
-          return coincideId && coincideUser && coincideMovie && coincideEstado && coincideFecha;
+          return coincideUser && coincideMovie && coincideEstado && coincideFecha;
         });
 
       setReservas(filtradas);
@@ -218,7 +217,6 @@ export default function AdminReservasPage() {
 
   const handleClearFilters = () => {
     const filtrosVacios = {
-      id: '',
       user: '',
       date: '',
       movie: '',
