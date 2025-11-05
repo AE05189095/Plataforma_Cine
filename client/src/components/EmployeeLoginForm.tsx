@@ -40,8 +40,9 @@ export default function EmployeeLoginForm({ userType }: Props) {
       localStorage.setItem(TOKEN_KEY, data.token);
 
       // Redirección según tipo de usuario
-      if (userType === "admin") router.push("/admin/dashboard");
-      else router.push("/welcome");
+      if (userType === "admin"){router.push("/admin/dashboard");
+      } else if (userType === "colaborador") {router.push("/admin/dashboard");
+      }else router.push("/welcome");
     } catch {
       setError("Error de conexión. Verifica que el backend esté ejecutándose.");
     } finally {

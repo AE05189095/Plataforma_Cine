@@ -48,6 +48,13 @@ export default function LoginPage({ userType }: LoginPageProps) {
       // redirección prioritaria: ?next=
       // Obtener el next param desde la URL actual en cliente
       const next = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+
+     console.log("🔑 Token recibido:", data.token);
+      console.log("👤 Tipo de usuario:", userType);
+console.log("➡️ Next param:", next);
+
+await new Promise(r => setTimeout(r, 50)); // pequeño delay (50ms)
+
       if (next) {
         router.push(next);
         return;

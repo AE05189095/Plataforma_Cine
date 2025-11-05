@@ -90,9 +90,9 @@ exports.update = async (req, res) => {
     try {
     const log = await Log.create({
       usuario: req.user._id,
-      role: "admin",
+      role: req.user?.role || 'admin',
       accion: "modificacion",
-      descripcion: `El administrador ${req.user.username || 'desconocido'} modificó la película "${updated.title}".`,
+      descripcion: `El usuario ${req.user.username || 'desconocido'} modificó la película "${updated.title}".`,
     });
     console.log("Log creado:", log);
   } catch (e) {

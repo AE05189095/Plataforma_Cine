@@ -71,7 +71,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     try {
       const role = payload.role as string | undefined;
       const path = window.location.pathname || "";
-      if (path.startsWith("/admin") && role !== "admin") {
+      if (path.startsWith("/admin") && role !== "admin" && role !== "colaborador") {
         localStorage.removeItem(TOKEN_KEY);
         router.replace("/login-admin");
         return;

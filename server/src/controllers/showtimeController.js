@@ -411,7 +411,7 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ message: 'Acceso denegado' });
+    if (!req.user || !['admin', 'colaborador'].includes(req.user.role)) return res.status(403).json({ message: 'Acceso denegado' });
 
     const { id } = req.params;
     if (!id) return res.status(400).json({ message: 'ID es requerido' });
@@ -468,9 +468,9 @@ exports.update = async (req, res) => {
     try {
     await Log.create({
       usuario: req.user?._id,
-      role: 'admin',
+      role: req.user?.role || 'admin',
       accion: 'modificacion',
-      descripcion: `El administrador ${req.user?.username || 'desconocido'} modificó el horario de la película "${populated.movie?.title || 'desconocida'}" en la sala "${populated.hall?.name || 'sin nombre'}" (${toYMD(populated.startAt)} ${toHHmm(populated.startAt)}).`,
+      descripcion: `El usuario ${req.user?.username || 'desconocido'} modificó el horario de la película "${populated.movie?.title || 'desconocida'}" en la sala "${populated.hall?.name || 'sin nombre'}" (${toYMD(populated.startAt)} ${toHHmm(populated.startAt)}).`,
       });
     } catch (logErr) {
     console.error('Error registrando log de modificación de horario:', logErr);

@@ -1,6 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { API_BASE } from "@/lib/config";
+import { jwtDecode } from "jwt-decode";
+
+type TokenPayload = {
+  userId: string;
+  username: string;
+  role: string;
+};
 
 type Movie = {
   _id: string;
@@ -18,6 +25,20 @@ type Movie = {
 };
 
 export default function AdminPeliculasPage() {
+
+const [userRole, setUserRole] = useState<string | null>(null);
+useEffect(() => {
+  const token = localStorage.getItem("app_token");
+  if (token) {
+    try {
+     const decoded: TokenPayload = jwtDecode(token);
+      setUserRole(decoded.role);
+    } catch (e) {
+      console.error("Error decodificando token:", e);
+    }
+  }
+}, []);
+
   const headerStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
 
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -140,8 +161,10 @@ export default function AdminPeliculasPage() {
     <div className="py-8">
       <div className="flex items-center justify-between mb-6 p-4 rounded-lg" style={headerStyle}>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Gestión de Películas</h1>
+        {userRole === "admin" && (
         <button onClick={openCreate} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors font-semibold shadow-lg">+ Agregar Película</button>
-      </div>
+        )}
+        </div>
 
       {loading && <p style={{ color: 'var(--foreground)' }}>Cargando películas...</p>}
       {error && <p className="text-red-400">{error}</p>}
@@ -166,8 +189,10 @@ export default function AdminPeliculasPage() {
               <div className="text-sm text-gray-400">{m.duration ? `${m.duration} min` : ''}</div>
               <div className="flex items-center gap-2">
                 <button onClick={() => openEditor(m)} className="px-3 py-1 rounded btn-primary">Editar</button>
+                {userRole === "admin" && (
                 <button onClick={() => deleteMovie(m._id)} className="px-3 py-1 bg-red-600 text-white rounded">Eliminar</button>
-              </div>
+                )}
+                </div>
             </div>
           </div>
         ))}
