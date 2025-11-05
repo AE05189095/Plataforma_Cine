@@ -174,7 +174,7 @@ export default function HomePage() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white">
+        <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
             <Header
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm as Dispatch<SetStateAction<string>>}

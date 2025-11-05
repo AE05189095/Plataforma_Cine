@@ -24,6 +24,8 @@ export default function Header(props: HeaderProps = {}) {
 
     // Determina si estamos en la página de inicio
     const isHomePage = pathname === '/';
+    // 🔒 Ocultar barra de búsqueda y filtros en vistas de admin
+    const isAdminView = pathname?.startsWith("/admin") || pathname?.startsWith("/admin-dev-mode");
 
     // Lógica de autenticación (sin cambios)
     useEffect(() => {
@@ -138,6 +140,7 @@ export default function Header(props: HeaderProps = {}) {
       </div>
 
       {/* 🔸 Controles de búsqueda y filtros */}
+      {!isAdminView && (
       <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
         <input
           type="text"
@@ -182,6 +185,7 @@ export default function Header(props: HeaderProps = {}) {
           </button>
         )}
       </div>
+      )}
 
       {/* 🔸 Botón de perfil o login */}
       <div className="flex items-center justify-end flex-shrink-0">
