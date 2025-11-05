@@ -3,6 +3,13 @@ import React, { useEffect, useState } from "react";
 import DarkSelect from '@/components/DarkSelect';
 import ConfirmModal from '@/components/ConfirmModal';
 import { API_BASE } from "@/lib/config";
+import { jwtDecode } from "jwt-decode";
+
+type TokenPayload = {
+  userId: string;
+  username: string;
+  role: string;
+};
 
 type Hall = {
   _id: string;
@@ -23,6 +30,18 @@ type Movie = { _id: string; title?: string };
 type ShowtimeShort = { _id: string; movie?: { _id?: string; title?: string } | string; hall?: { _id?: string; name?: string } | string; startAt: string; time?: string; date?: string; availableSeats?: number };
 
 export default function AdminSalasPage() {
+  const [userRole, setUserRole] = useState<string | null>(null);
+    useEffect(() => {
+      const token = localStorage.getItem("app_token");
+      if (token) {
+        try {
+         const decoded: TokenPayload = jwtDecode(token);
+          setUserRole(decoded.role);
+        } catch (e) {
+          console.error("Error decodificando token:", e);
+        }
+      }
+    }, []);
   const [halls, setHalls] = useState<Hall[]>([]);
   const [groups, setGroups] = useState<HallGroup[] | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);

@@ -61,7 +61,7 @@ exports.update = async (req, res) => {
           usuario: req.user?._id,
           role: req.user?.role || 'admin',
           accion: 'modificacion',
-          descripcion: `El administrador ${req.user?.username || 'desconocido'} modificó la sala "${hall.name}" asignando la película "${hall.movie?.title || 'sin asignar'}".`
+          descripcion: `El usuario ${req.user?.username || 'desconocido'} modificó la sala "${hall.name}" asignando la película "${hall.movie?.title || 'sin asignar'}".`
         });
       } catch (logErr) {
         console.error('Error registrando log de modificación de sala:', logErr);

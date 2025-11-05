@@ -5,6 +5,13 @@ import { io, Socket } from 'socket.io-client';
 import ConfirmModal from '@/components/ConfirmModal';
 import { API_BASE} from "../../../lib/config";
 import { useSearchParams } from 'next/navigation';
+import { jwtDecode } from "jwt-decode";
+
+type TokenPayload = {
+  userId: string;
+  username: string;
+  role: string;
+};
 
 type Movie = { _id: string; title: string; duration?: number };
 type Hall = { _id: string; name?: string; capacity?: number };
@@ -22,6 +29,20 @@ type Showtime = {
 };
 
 export default function AdminHorariosPage() {
+
+  const [userRole, setUserRole] = useState<string | null>(null);
+  useEffect(() => {
+    const token = localStorage.getItem("app_token");
+    if (token) {
+      try {
+       const decoded: TokenPayload = jwtDecode(token);
+        setUserRole(decoded.role);
+      } catch (e) {
+        console.error("Error decodificando token:", e);
+      }
+    }
+  }, []);
+
   const [showtimes, setShowtimes] = useState<Showtime[]>([]);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [halls, setHalls] = useState<Hall[]>([]);
@@ -254,8 +275,10 @@ export default function AdminHorariosPage() {
     <div className="py-8">
       <div className="flex items-center justify-between mb-6 p-4 rounded-lg" style={boxStyle}>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Gestión de Horarios</h1>
+        {userRole === "admin" && (
         <button onClick={openCreate} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors font-semibold shadow-lg">+ Agregar Función</button>
-      </div>
+        )}
+        </div>
 
       {error && (
         <div className="mb-4 p-3 rounded" style={{ background: 'rgba(255,50,50,0.08)', color: 'var(--foreground)' }}>{error}</div>
@@ -298,8 +321,10 @@ export default function AdminHorariosPage() {
                     <td className="px-4 py-3">{formatPrice(typeof st.premiumPrice === 'number' ? st.premiumPrice : 0)}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => openEdit(st)} className="mr-3 text-sm px-2 py-1 rounded btn-primary">Editar</button>
+                      {userRole === "admin" && (
                       <button onClick={() => handleDelete(st._id)} className="text-sm" style={{ color: '#ff6b6b' }}>Eliminar</button>
-                    </td>
+                      )}
+                      </td>
                   </tr>
                 );
               })}
@@ -344,7 +369,6 @@ export default function AdminHorariosPage() {
                 <input type="number" min={0} step="0.01" value={form.premiumPrice} onChange={e => setForm({ ...form, premiumPrice: e.target.value })} className="w-full p-2 rounded bg-gray-800 text-white border border-gray-600" />
               </label>
             </div>
-
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600">Cancelar</button>
               <button type="submit" className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white">{editing ? 'Guardar' : 'Crear'}</button>
