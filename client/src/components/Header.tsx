@@ -20,10 +20,12 @@ type HeaderProps = {
 export default function Header(props: HeaderProps = {}) {
     const [isLogged, setIsLogged] = useState(false);
     const router = useRouter();
-    const pathname = usePathname(); // 🚨 Hook para obtener la ruta actual
+  const pathname = usePathname(); // 🚨 Hook para obtener la ruta actual
 
     // Determina si estamos en la página de inicio
-    const isHomePage = pathname === '/';
+  const isHomePage = pathname === '/';
+  // Ocultar filtros sólo en la pantalla admin/dashboard
+  const isAdminDashboard = pathname === '/admin/dashboard';
 
     // Lógica de autenticación (sin cambios)
     useEffect(() => {
@@ -125,8 +127,8 @@ export default function Header(props: HeaderProps = {}) {
             else router.push("/");
           }}
         >
-          <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black">
+          <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-yellow-400 rounded-lg flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black">
               <rect width="18" height="18" x="3" y="3" rx="2" />
               <path d="M7 3v18M17 3v18M3 7.5h4M17 7.5h4M3 16.5h4M17 16.5h4" />
             </svg>
@@ -137,51 +139,53 @@ export default function Header(props: HeaderProps = {}) {
         </div>
       </div>
 
-      {/* 🔸 Controles de búsqueda y filtros */}
-      <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
-        <input
-          type="text"
-          placeholder="Buscar películas..."
-          className="w-full sm:w-52 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white placeholder:text-gray-400 focus:outline-none focus:border-red-500 text-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm && setSearchTerm(e.target.value)}
-        />
+      {/* 🔸 Controles de búsqueda y filtros (ocultos en /admin/dashboard) */}
+      {!isAdminDashboard && (
+        <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
+          <input
+            type="text"
+            placeholder="Buscar películas..."
+            className="w-full sm:w-52 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white placeholder:text-gray-400 focus:outline-none focus:border-red-500 text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm && setSearchTerm(e.target.value)}
+          />
 
-        <select
-          className="w-full sm:w-40 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white text-sm focus:outline-none"
-          value={selectedGenre}
-          onChange={(e) => setSelectedGenre && setSelectedGenre(e.target.value)}
-        >
-          <option value="Todos los géneros">Todas</option>
-          <option value="Comedia">Comedia</option>
-          <option value="Acción">Acción</option>
-          <option value="Drama">Drama</option>
-          <option value="Ciencia Ficción">Ciencia Ficción</option>
-          <option value="Romance">Romance</option>
-          <option value="Terror">Terror</option>
-          <option value="Suspense">Suspense</option>
-          <option value="Animación">Animación</option>
-          <option value="Documental">Documental</option>
-          <option value="Familiar">Familiar</option>
-        </select>
-
-        <input
-          type="date"
-          className="w-full sm:w-36 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white text-sm focus:outline-none cursor-pointer"
-          style={{ colorScheme: "dark" }}
-          value={selectedDate}
-          onChange={(e) => setSelectedDate && setSelectedDate(e.target.value)}
-        />
-
-        {areFiltersActive && (
-          <button
-            onClick={handleClearFilters}
-            className="px-3 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition text-sm font-semibold whitespace-nowrap"
+          <select
+            className="w-full sm:w-40 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white text-sm focus:outline-none"
+            value={selectedGenre}
+            onChange={(e) => setSelectedGenre && setSelectedGenre(e.target.value)}
           >
-            Limpiar
-          </button>
-        )}
-      </div>
+            <option value="Todos los géneros">Todas</option>
+            <option value="Comedia">Comedia</option>
+            <option value="Acción">Acción</option>
+            <option value="Drama">Drama</option>
+            <option value="Ciencia Ficción">Ciencia Ficción</option>
+            <option value="Romance">Romance</option>
+            <option value="Terror">Terror</option>
+            <option value="Suspense">Suspense</option>
+            <option value="Animación">Animación</option>
+            <option value="Documental">Documental</option>
+            <option value="Familiar">Familiar</option>
+          </select>
+
+          <input
+            type="date"
+            className="w-full sm:w-36 px-3 py-2 rounded-md border border-red-600 bg-gray-800 text-white text-sm focus:outline-none cursor-pointer"
+            style={{ colorScheme: "dark" }}
+            value={selectedDate}
+            onChange={(e) => setSelectedDate && setSelectedDate(e.target.value)}
+          />
+
+          {areFiltersActive && (
+            <button
+              onClick={handleClearFilters}
+              className="px-3 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition text-sm font-semibold whitespace-nowrap"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+      )}
 
       {/* 🔸 Botón de perfil o login */}
       <div className="flex items-center justify-end flex-shrink-0">

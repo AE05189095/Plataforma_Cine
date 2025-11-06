@@ -24,7 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Top tabs styled with project palette variables */}
         <div className="max-w-4xl mx-auto px-4 py-4">
           <nav
-            className="flex items-center gap-2 overflow-x-auto rounded-full px-3 py-2 scrollbar-hide"
+            className="flex w-full items-center gap-2 overflow-x-auto md:overflow-visible rounded-full px-3 py-2 scrollbar-hide justify-start md:justify-evenly"
             style={{
               background: "rgba(0,0,0,0.35)",
               border: "1px solid #DC2626",
