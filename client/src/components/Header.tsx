@@ -24,8 +24,8 @@ export default function Header(props: HeaderProps = {}) {
 
     // Determina si estamos en la página de inicio
   const isHomePage = pathname === '/';
-  // Ocultar filtros sólo en la pantalla admin/dashboard
-  const isAdminDashboard = pathname === '/admin/dashboard';
+  // Ocultar filtros en cualquier sección de administración
+  const isAdminSection = pathname?.startsWith('/admin');
 
     // Lógica de autenticación (sin cambios)
     useEffect(() => {
@@ -139,8 +139,8 @@ export default function Header(props: HeaderProps = {}) {
         </div>
       </div>
 
-      {/* 🔸 Controles de búsqueda y filtros (ocultos en /admin/dashboard) */}
-      {!isAdminDashboard && (
+      {/* 🔸 Controles de búsqueda y filtros (ocultos en secciones /admin) */}
+      {!isAdminSection && (
         <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 w-full sm:w-auto">
           <input
             type="text"

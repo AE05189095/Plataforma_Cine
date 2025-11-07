@@ -33,7 +33,8 @@ interface Filtros {
 
 export default function AdminReservasPage() {
   const headerStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
-  const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
+  // Encabezado de tabla debe ser sólido para que no se vea el contenido al hacer scroll
+  const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,1)', border: '1px solid rgba(255,255,255,0.04)' };
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [filtros, setFiltros] = useState<Filtros>({
