@@ -56,14 +56,15 @@ console.log("➡️ Next param:", next);
 await new Promise(r => setTimeout(r, 50)); // pequeño delay (50ms)
 
       if (next) {
-        router.push(next);
+        // Reemplazar la entrada de login en el historial
+        router.replace(next);
         return;
       }
 
   // 🔸 Redirección según tipo
-  if (userType === "admin") router.push("/admin-dashboard");
-  else if (userType === "colaborador") router.push("/dashboard-colaborador");
-  else router.push("/profile");
+  if (userType === "admin") router.replace("/admin-dashboard");
+  else if (userType === "colaborador") router.replace("/dashboard-colaborador");
+  else router.replace("/profile");
 
     } catch {
       setError("Error de conexión. Asegúrate de que el servidor Express esté encendido (Puerto 5000).");
@@ -184,7 +185,7 @@ await new Promise(r => setTimeout(r, 50)); // pequeño delay (50ms)
                   <button
                     type="button"
                     onClick={() => router.push("/recover-password")}
-                    className="inline-block font-medium text-red-400 hover:text-red-300 border border-red-600 rounded-full px-4 py-2 transition-colors bg-transparent hover:bg-red-600 hover:text-white"
+                    className="inline-block font-medium text-red-400 border border-red-600 rounded-full px-4 py-2 transition-colors bg-transparent hover:bg-red-600 hover:text-white"
                   >
                     {userType === "admin"
                       ? "¿Recuperar contraseña de administrador?"

@@ -19,6 +19,7 @@ type HeaderProps = {
 // Componente de encabezado
 export default function Header(props: HeaderProps = {}) {
     const [isLogged, setIsLogged] = useState(false);
+  const [role, setRole] = useState<"admin" | "colaborador" | "cliente" | null>(null);
     const router = useRouter();
   const pathname = usePathname(); // 🚨 Hook para obtener la ruta actual
 
@@ -28,13 +29,14 @@ export default function Header(props: HeaderProps = {}) {
   const isAdminSection = pathname?.startsWith('/admin');
 
     // Lógica de autenticación (sin cambios)
-    useEffect(() => {
+  useEffect(() => {
         // ... (Lógica de validación de token)
         const validate = async () => {
             try {
                 const token = localStorage.getItem(TOKEN_KEY);
                 if (!token) {
                     setIsLogged(false);
+          setRole(null);
                     return;
                 }
 
@@ -43,14 +45,27 @@ export default function Header(props: HeaderProps = {}) {
                 });
 
                 if (res.ok) {
-                    setIsLogged(true);
+          setIsLogged(true);
+          try {
+            const data = await res.json();
+            const r = data?.user?.role as string | undefined;
+            if (r === 'admin' || r === 'colaborador' || r === 'cliente') {
+            setRole(r);
+            } else {
+            setRole(null);
+            }
+          } catch {
+            setRole(null);
+          }
                 } else {
                     localStorage.removeItem(TOKEN_KEY);
                     setIsLogged(false);
+          setRole(null);
                 }
             } catch {
                 localStorage.removeItem(TOKEN_KEY);
                 setIsLogged(false);
+        setRole(null);
             }
         };
 
@@ -61,7 +76,7 @@ export default function Header(props: HeaderProps = {}) {
         return () => window.removeEventListener('authChange', onAuth);
     }, []);
 
-    const handleProfile = () => {
+  const handleProfile = () => {
         router.push("/profile");
     };
 
@@ -95,17 +110,26 @@ export default function Header(props: HeaderProps = {}) {
         router.push('/');
     };
 
-    // 🚨 Nueva función para manejar el botón de regreso
-    const handleGoBack = () => {
-        router.back();
-    };
+  // 🚨 Nueva función para manejar el botón de regreso
+  const handleGoBack = () => {
+    // Si estamos en cualquier sección de administración, ir directo al Home
+    if (isAdminSection) {
+      router.replace('/');
+      return;
+    }
+    // En el resto del sitio, usar el historial normal
+    router.back();
+  };
+
+  // 🚩 Mostrar botón Dashboard solo en Home y si rol es admin o colaborador
+  const showDashboard = isHomePage && (role === 'admin' || role === 'colaborador');
 
 
     return (
   <header className="bg-black text-white p-4 sticky top-0 z-40 shadow-md">
     <div className="max-w-[1280px] mx-auto flex flex-wrap items-center justify-between gap-4">
       
-      {/* 🔸 Logo y botón de regresar */}
+      {/* 🔸 Logo, botón de regresar y acceso rápido a Dashboard (si aplica) */}
       <div className="flex items-center gap-3">
         {!isHomePage && (
           <button
@@ -137,6 +161,19 @@ export default function Header(props: HeaderProps = {}) {
             CineGT
           </span>
         </div>
+
+        {showDashboard && (
+          <button
+            onClick={() => router.push('/admin/dashboard')}
+            className="ml-2 px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition flex items-center gap-2 text-sm font-semibold"
+          >
+            {/* Icono de panel */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+            </svg>
+            Dashboard
+          </button>
+        )}
       </div>
 
       {/* 🔸 Controles de búsqueda y filtros (ocultos en secciones /admin) */}
