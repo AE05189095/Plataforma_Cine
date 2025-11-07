@@ -17,6 +17,9 @@ interface ReservationSummaryProps {
     perSeatPrice?: number | null; // si se pasa, usar por asiento (deprecated a favor de regularPrice/premiumPrice)
     regularPrice?: number | null; // si ambos están presentes, usar diferenciación por asiento
     premiumPrice?: number | null;
+    // Opcional: deshabilitar compra por motivos de rol u otros
+    disablePurchase?: boolean;
+    disableReason?: string;
 }
 
 const calculateTotal = (seats: Seat[], perSeatPrice?: number | null, regularPrice?: number | null, premiumPrice?: number | null) => {
@@ -57,7 +60,7 @@ const CountdownTimer = ({ expirationTime, onExpiration }: { expirationTime: Date
     );
 };
 
-export default function ReservationSummary({ seats, expirationTime, onExpiration, onPurchase, perSeatPrice, regularPrice, premiumPrice }: ReservationSummaryProps) {
+export default function ReservationSummary({ seats, expirationTime, onExpiration, onPurchase, perSeatPrice, regularPrice, premiumPrice, disablePurchase, disableReason }: ReservationSummaryProps) {
     const total = calculateTotal(seats, perSeatPrice ?? null, regularPrice ?? null, premiumPrice ?? null);
 
     return (
@@ -89,11 +92,17 @@ export default function ReservationSummary({ seats, expirationTime, onExpiration
 
             <button
                 onClick={onPurchase}
-                disabled={seats.length === 0}
+                disabled={seats.length === 0 || !!disablePurchase}
                 className="mt-6 w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                title={disablePurchase ? (disableReason || 'Acción no permitida') : undefined}
             >
                 Confirmar Compra ({seats.length} Asiento{seats.length !== 1 ? 's' : ''})
             </button>
+            {disablePurchase && (
+                <div className="mt-2 text-sm text-red-400">
+                    {disableReason || 'Las compras no están disponibles para tu rol.'}
+                </div>
+            )}
         </div>
     );
 }

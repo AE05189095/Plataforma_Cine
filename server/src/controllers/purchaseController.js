@@ -100,8 +100,15 @@ exports.create = async (req, res) => {
     session.startTransaction();
 
     const userId = req.user?._id;
+    const userRole = req.user?.role;
     const { paymentIntentId } = req.body;
     let { showtimeId, seats } = req.body; // Estos vienen del cliente ahora
+
+    // Bloquear compras para administradores y colaboradores
+    if (!userRole || userRole !== 'cliente') {
+      await session.abortTransaction();
+      return res.status(403).json({ message: 'Las compras están permitidas únicamente para usuarios regulares.' });
+    }
 
     if (!userId || !paymentIntentId) {
       await session.abortTransaction();

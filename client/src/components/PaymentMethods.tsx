@@ -25,6 +25,21 @@ function PaymentForm({ amount, onCancel, showtimeId, seatsSelected, onConflict }
   const [error, setError] = useState<string | null>(null);
   const stripe = useStripe();
   const elements = useElements();
+  const [isRestrictedRole, setIsRestrictedRole] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) { setIsRestrictedRole(false); return; }
+      const payloadStr = token.split('.')[1];
+      const decoded = atob(payloadStr.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(decodeURIComponent(decoded.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+      const role = payload?.role || 'cliente';
+      setIsRestrictedRole(role === 'admin' || role === 'colaborador');
+    } catch {
+      setIsRestrictedRole(false);
+    }
+  }, []);
 
   const handleConfirm = async () => {
     if (method !== 'card' || !stripe || !elements) {
@@ -191,11 +206,17 @@ function PaymentForm({ amount, onCancel, showtimeId, seatsSelected, onConflict }
           <button 
             className="px-4 py-2 rounded bg-red-600" 
             onClick={handleConfirm} 
-            disabled={loading}
+            disabled={loading || isRestrictedRole}
+            title={isRestrictedRole ? 'No disponible para administradores o colaboradores.' : undefined}
           >
             {loading ? 'Procesando...' : 'Confirmar compra'}
           </button>
         </div>
+        {isRestrictedRole && (
+          <div className="mt-2 text-sm text-red-400">
+            Las compras están deshabilitadas para administradores y colaboradores.
+          </div>
+        )}
       </div>
     </div>
   );
