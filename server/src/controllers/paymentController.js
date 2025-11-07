@@ -109,6 +109,12 @@ exports.retrieveCheckoutSession = async (req, res) => {
 exports.chargeWithToken = async (req, res) => {
   if (!stripe) return res.status(503).json({ message: 'Stripe no está configurado en el servidor' });
   try {
+    // Requiere auth en la ruta; bloquear admin/colaborador
+    const role = req.user?.role;
+    if (!role || role !== 'cliente') {
+      return res.status(403).json({ message: 'Las compras están permitidas únicamente para usuarios regulares.' });
+    }
+
     const { amount, currency = 'GTQ', paymentMethodId, metadata = {} } = req.body;
 
     if (!amount || !paymentMethodId) {

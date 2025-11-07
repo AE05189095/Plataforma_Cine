@@ -44,6 +44,32 @@ export default function ComprarPage() {
     open: false,
     message: ''
   });
+  const [isRestrictedRole, setIsRestrictedRole] = useState<boolean>(false);
+
+  // Detectar rol desde el token para bloquear compras a admin/colaborador
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) { setIsRestrictedRole(false); return; }
+      const parseJwt = (t: string) => {
+        try {
+          const payload = t.split(".")[1];
+          const decoded = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+          return JSON.parse(
+            decodeURIComponent(
+              decoded
+                .split("")
+                .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                .join("")
+            )
+          );
+        } catch { return null; }
+      };
+      const payload = parseJwt(token) as { role?: string } | null;
+      const role = payload?.role || 'cliente';
+      setIsRestrictedRole(role === 'admin' || role === 'colaborador');
+    } catch { setIsRestrictedRole(false); }
+  }, []);
 
   // Control de llamadas para evitar ráfagas y duplicados (React Strict Mode)
   const inFlightRef = useRef<boolean>(false);
@@ -303,6 +329,10 @@ export default function ComprarPage() {
   }, [updateSeatLocks, fetchShowtime]);
 
   const handlePurchase = useCallback(() => {
+    if (isRestrictedRole) {
+      setToast({ open: true, message: 'Las compras están deshabilitadas para administradores y colaboradores.', type: 'error' });
+      return;
+    }
     if (selected.length === 0) {
       setToast({ open: true, message: 'Selecciona asientos primero', type: 'error' });
       return;
@@ -313,7 +343,7 @@ export default function ComprarPage() {
       return acc + (s.status === 'premium' ? 65 : 45);
     }, 0);
     setPaymentModal({ open: true, seats: selected, total });
-  }, [selected, showtime]);
+  }, [selected, showtime, isRestrictedRole]);
 
   // =============================
   // RENDER
@@ -371,6 +401,8 @@ export default function ComprarPage() {
                   onPurchase={handlePurchase}
                   regularPrice={typeof showtime?.price === 'number' ? showtime.price : null}
                   premiumPrice={typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0 ? showtime.premiumPrice : null}
+                  disablePurchase={isRestrictedRole}
+                  disableReason={isRestrictedRole ? 'No disponible para administradores o colaboradores.' : undefined}
                 />
               </div>
             </div>

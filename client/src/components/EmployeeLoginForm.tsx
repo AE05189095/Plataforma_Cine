@@ -39,10 +39,26 @@ export default function EmployeeLoginForm({ userType }: Props) {
 
       localStorage.setItem(TOKEN_KEY, data.token);
 
+      // Si venía con ?next=, respetarlo para volver a la ruta solicitada
+      try {
+        const next = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('next')
+          : null;
+        if (next) {
+          router.replace(next);
+          return;
+        }
+      } catch {}
+
       // Redirección según tipo de usuario
-      if (userType === "admin"){router.push("/admin/dashboard");
-      } else if (userType === "colaborador") {router.push("/admin/dashboard");
-      }else router.push("/welcome");
+      // Usamos replace para que el botón "Atrás" no regrese a la pantalla de login
+      if (userType === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (userType === "colaborador") {
+        router.replace("/admin/dashboard");
+      } else {
+        router.replace("/welcome");
+      }
     } catch {
       setError("Error de conexión. Verifica que el backend esté ejecutándose.");
     } finally {
