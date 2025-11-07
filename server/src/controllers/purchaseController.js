@@ -324,16 +324,23 @@ exports.create = async (req, res) => {
 
 
     // ==========================================================
-    // Preparar fecha y hora para correo
+    // Preparar fecha (de compra) y hora (del showtime) para correo
     // ==========================================================
-    let showtimeDate = showtime.startAt instanceof Date && !isNaN(showtime.startAt)
-      ? showtime.startAt
-      : new Date(`${showtime.date}T${showtime.time}`);
+    // La fecha a mostrar debe ser la fecha de la compra (hoy), no la fecha del showtime.
+    // Usamos el createdAt de la compra recién creada para mayor precisión.
+    const purchaseDate = new Date(createdPurchase[0].createdAt || Date.now());
 
-    let formattedDate = showtimeDate.toLocaleDateString('es-GT', {
-      day: 'numeric', month: 'long', year: 'numeric'
+    // Hora mostrada: la del showtime, no la hora de compra
+    const showtimeDate = (
+      showtime.startAt instanceof Date && !isNaN(showtime.startAt)
+    ) ? showtime.startAt : new Date(`${showtime.date}T${showtime.time}`);
+
+    const formattedDate = purchaseDate.toLocaleDateString('es-GT', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guatemala'
     });
-    let formattedTime = showtimeDate.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const formattedTime = showtimeDate.toLocaleTimeString('es-GT', {
+      hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Guatemala'
+    });
 
     const userEmail = req.user?.email || 'correo@falso.com';
 
