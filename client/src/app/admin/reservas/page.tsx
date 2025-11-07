@@ -1,9 +1,8 @@
 'use client';
-import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import { io } from 'socket.io-client';
-import { API_BASE, TOKEN_KEY } from "../../../lib/config";
+import { API_BASE } from "../../../lib/config";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -33,7 +32,8 @@ interface Filtros {
 
 export default function AdminReservasPage() {
   const headerStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
-  const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,0.7)', border: '1px solid rgba(255,255,255,0.04)' };
+  // Encabezado de tabla debe ser sólido para que no se vea el contenido al hacer scroll
+  const boxStyle: React.CSSProperties = { background: 'rgba(6,18,30,1)', border: '1px solid rgba(255,255,255,0.04)' };
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [filtros, setFiltros] = useState<Filtros>({
@@ -80,14 +80,16 @@ export default function AdminReservasPage() {
 
   // Cargar películas al montar el componente
   useEffect(() => {
+    type MovieSummary = { title?: string; isActive?: boolean };
     const fetchPeliculas = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/movies`);
         if (!res.ok) throw new Error('No se pudo obtener películas');
-        const data = await res.json();
-
-        const activas = data.filter((p: any) => p.isActive); // si usás isActive
-        const titulos = activas.map((p: any) => p.title);
+        const data: MovieSummary[] = await res.json();
+        // Tomar solo películas activas con título definido
+        const titulos = data
+          .filter((p): p is Required<Pick<MovieSummary, 'title'>> & MovieSummary => !!p.title && !!p.isActive)
+          .map((p) => p.title);
         setPeliculasDisponibles(titulos);
       } catch (error) {
         console.error('Error al cargar películas:', error);
