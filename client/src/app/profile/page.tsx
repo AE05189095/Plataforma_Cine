@@ -6,7 +6,12 @@ import { API_BASE} from "@/lib/config";
 
 // Nota: Asumimos que el token es gestionado con la clave 'app_token'
 
-type User = { id: string; username: string; email: string } | null;
+type User = {
+  id: string;
+  username: string;
+  email: string;
+  role?: 'cliente' | 'admin' | 'colaborador' | string;
+} | null;
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User>(null);
@@ -142,15 +147,17 @@ export default function ProfilePage() {
                 <div className="font-semibold text-white">***********</div>
               </div>
 
-              {/* Enlace al historial */}
-              <div className="mt-4">
-                <a
-                  href="/profile/UserHistory"
-                  className="text-amber-400 underline text-sm sm:text-base"
-                >
-                  Ver historial de entradas
-                </a>
-              </div>
+              {/* Enlace al historial: solo visible para clientes (no admin/colaborador) */}
+              {(!user?.role || (user.role !== 'admin' && user.role !== 'colaborador')) && (
+                <div className="mt-4">
+                  <a
+                    href="/profile/UserHistory"
+                    className="text-amber-400 underline text-sm sm:text-base"
+                  >
+                    Ver historial de entradas
+                  </a>
+                </div>
+              )}
 
               {/* Botones */}
               <div className="flex flex-col sm:flex-row gap-3 mt-5">
