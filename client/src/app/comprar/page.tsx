@@ -337,11 +337,16 @@ export default function ComprarPage() {
       setToast({ open: true, message: 'Selecciona asientos primero', type: 'error' });
       return;
     }
-    const perSeat = typeof showtime?.price === 'number' ? showtime!.price : null;
+    
+    // Lógica de cálculo de precios mejorada en el cliente para reflejar el backend
+    const regularPrice = typeof showtime?.price === 'number' ? showtime.price : getPriceForHall(showtime?.hall?.name);
+    const premiumPrice = typeof showtime?.premiumPrice === 'number' && showtime.premiumPrice > 0 ? showtime.premiumPrice : regularPrice;
+
     const total = selected.reduce((acc, s) => {
-      if (perSeat !== null) return acc + perSeat;
-      return acc + (s.status === 'premium' ? 65 : 45);
+      const price = s.status === 'premium' ? premiumPrice : regularPrice;
+      return acc + price;
     }, 0);
+
     setPaymentModal({ open: true, seats: selected, total });
   }, [selected, showtime, isRestrictedRole]);
 

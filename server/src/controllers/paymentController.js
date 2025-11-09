@@ -1,4 +1,6 @@
 const Stripe = require('stripe');
+const Showtime = require('../models/Showtime');
+const { getPremiumSeats } = require('./showtimeController');
 
 // Inicializar Stripe solo si hay una clave en las variables de entorno.
 // Si falta, evitamos lanzar una excepción y manejamos el caso en los handlers
@@ -18,14 +20,35 @@ if (stripeKey && String(stripeKey).trim()) {
 exports.createPaymentIntent = async (req, res) => {
   if (!stripe) return res.status(503).json({ message: 'Stripe no está configurado en el servidor' });
   try {
-    const { amount, currency = 'GTQ', metadata = {} } = req.body;
+    const { showtimeId, seatIds, currency = 'GTQ', metadata = {} } = req.body;
 
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      return res.status(400).json({ message: 'Amount (number) is required' });
+    if (!showtimeId || !Array.isArray(seatIds) || seatIds.length === 0) {
+      return res.status(400).json({ message: 'showtimeId y una lista de seatIds son requeridos' });
+    }
+
+    const showtime = await Showtime.findById(showtimeId).lean();
+    if (!showtime) {
+      return res.status(404).json({ message: 'Función no encontrada' });
+    }
+
+    const regularPrice = showtime.price || 0;
+    const premiumPrice = showtime.premiumPrice || regularPrice; // Fallback al precio regular si no hay premium
+
+    const premiumSeats = getPremiumSeats(seatIds);
+    const regularSeatsCount = seatIds.length - premiumSeats.length;
+
+    const totalAmount = (regularSeatsCount * regularPrice) + (premiumSeats.length * premiumPrice);
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ message: 'El monto total debe ser mayor a cero.' });
     }
 
     // Stripe expects amount in the smallest currency unit (céntimos)
-    const amountInCents = Math.round(amount * 100);
+    const amountInCents = Math.round(totalAmount * 100);
+
+    // Adjuntar datos importantes a los metadatos para usarlos en la confirmación de la compra
+    metadata.showtimeId = showtimeId;
+    metadata.seats = seatIds.join(',');
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
