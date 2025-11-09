@@ -43,6 +43,12 @@ const getLockedSeats = (showtime, currentUserId) => {
   return { seatsLocked: Array.from(new Set(allLockedSeats)), userLockedSeats: Array.from(new Set(userLockedSeats)) };
 };
 
+// Helper para identificar asientos premium (ej: filas V y P)
+exports.getPremiumSeats = (seatIds) => {
+  if (!Array.isArray(seatIds)) return [];
+  return seatIds.filter(seat => /^[VP]/.test(String(seat).toUpperCase()));
+};
+
 // ==========================================================
 // LIMPIEZA AUTOMÁTICA DE LOCKS EXPIRADOS
 // ==========================================================

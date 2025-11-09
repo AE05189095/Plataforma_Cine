@@ -4,6 +4,7 @@
     "@stripe/stripe-js": "^8.1.0",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.552.0",
     "nodemailer": "^7.0.9"
   }
