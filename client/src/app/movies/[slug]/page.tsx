@@ -130,7 +130,7 @@ export default function MovieDetailPage() {
     const [showtimes, setShowtimes] = useState<ShowTime[]>([]);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
-    const [filterDate, setFilterDate] = useState<string>('');
+    
     
     useEffect(() => {
         if (!slug) return;
@@ -249,26 +249,9 @@ export default function MovieDetailPage() {
         fetchData();
     }, [slug]);
 
-    // Inicializar filtro desde localStorage y escuchar cambios (limpiar desde otra vista)
-    useEffect(() => {
-        try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                const saved = window.localStorage.getItem('CineGT_filterDate') || '';
-                setFilterDate(saved);
-            }
-        } catch {}
-
-        // Evento personalizado para cambio de filtro de fecha.
-        type FilterDateChangedEvent = CustomEvent<string | undefined>;
-        const onChange = (ev: Event) => {
-            const v = (ev as FilterDateChangedEvent).detail || '';
-            setFilterDate(v);
-        };
-        document.addEventListener('CineGT_filterDateChanged', onChange);
-        return () => {
-            try { document.removeEventListener('CineGT_filterDateChanged', onChange); } catch {}
-        };
-    }, []);
+    // Nota: La funcionalidad de filtro por fecha se ha eliminado. Antes se sincronizaba
+    // `filterDate` con localStorage y se escuchaban eventos personalizados. Se mantienen
+    // otros efectos (fetch y sockets) intactos.
 
     // Real-time updates: escuchar eventos de showtimes para refrescar la vista automáticamente
     useEffect(() => {
@@ -496,47 +479,14 @@ export default function MovieDetailPage() {
                         <h2 className="text-3xl font-bold text-yellow-400 border-b-2 border-red-600 pb-2">
                             {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
                         </h2>
-                        <div className="flex items-center gap-4">
-                            <label htmlFor="filter-date" className="text-sm text-gray-300 hidden sm:block">Filtrar por fecha</label>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    id="filter-date"
-                                    type="date"
-                                    className="bg-gray-900 text-white px-4 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 min-w-[200px]"
-                                    value={filterDate || ''}
-                                    onChange={(e) => {
-                                        const v = e.target.value;
-                                        setFilterDate(v || '');
-                                        try { if (typeof window !== 'undefined' && window.localStorage) { if (v) window.localStorage.setItem('CineGT_filterDate', v); else window.localStorage.removeItem('CineGT_filterDate'); } } catch {}
-                                    }}
-                                />
-                                <button
-                                    type="button"
-                                    title="Limpiar filtro"
-                                    onClick={() => {
-                                        setFilterDate('');
-                                        try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('CineGT_filterDate'); } catch {}
-                                    }}
-                                    className="px-3 py-2 bg-amber-500 text-black rounded-md font-semibold hover:bg-amber-400"
-                                >
-                                    Limpiar
-                                </button>
-                            </div>
-                        </div>
+                        {/* Filtro de fecha eliminado: se muestran todos los horarios */}
                     </div>
 
-                    {/* Filtrar y ordenar showtimes por fecha/hora (más cercano -> más lejano) */}
+                    {/* Ordenar showtimes por fecha/hora (más cercano -> más lejano) */}
                     {(() => {
-                        // Usar la fecha seleccionada desde el estado (formato YYYY-MM-DD)
-                        const selectedDate: string | null = filterDate || null;
-
-                        const filtered = showtimes.filter(s => {
-                            if (!selectedDate) return true;
-                            if (!s.startISO) return false;
-                            return s.startISO.slice(0,10) === selectedDate;
-                        });
-
-                        const sorted = filtered.sort((a,b) => {
+                        // Mostrar todos los showtimes que se recibieron del backend,
+                        // ordenados por startISO (si está disponible).
+                        const sorted = showtimes.slice().sort((a,b) => {
                             const ta = a.startISO ? new Date(a.startISO).getTime() : 0;
                             const tb = b.startISO ? new Date(b.startISO).getTime() : 0;
                             return ta - tb; // más cercano (menor timestamp) primero
@@ -544,7 +494,7 @@ export default function MovieDetailPage() {
 
                         if (sorted.length === 0) {
                             return (
-                                <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para la fecha seleccionada."}</p>
+                                <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles."}</p>
                             );
                         }
 
