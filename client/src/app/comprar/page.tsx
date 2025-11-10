@@ -220,7 +220,7 @@ export default function ComprarPage() {
       const initialDelay = 500 + Math.floor(Math.random() * 1500);
       initialTimer = window.setTimeout(tick, initialDelay) as unknown as number;
       // Intervalo un poco mayor para aliviar rate limit cuando hay varias pestañas
-      pollTimer = window.setInterval(tick, 10000) as unknown as number;
+      pollTimer = window.setInterval(tick, 5000) as unknown as number;
     };
 
     startPolling();

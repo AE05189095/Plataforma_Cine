@@ -25,7 +25,7 @@ async function sendConfirmationEmail(to, purchaseDetails) {
         <p>Gracias por tu compra. Aquí están los detalles:</p>
         <ul style="list-style:none; padding:0;">
           <li><strong>Película:</strong> ${movie}</li>
-          <li><strong>Fecha:</strong> ${date}</li>
+          <li><strong>Fecha de la función:</strong> ${date}</li>
           <li><strong>Hora:</strong> ${time}</li>
           <li><strong>Sala:</strong> ${room}</li>
           <li><strong>Asientos:</strong> ${seat}</li>
