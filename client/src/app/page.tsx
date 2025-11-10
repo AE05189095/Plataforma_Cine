@@ -29,7 +29,16 @@ interface MovieData {
     releaseDate: string;
     duration: string;
     description: string;
+    id?: string;
+    slug?: string;
     isUpcoming?: boolean;
+}
+
+interface ShowtimeItem {
+    _id?: string;
+    movie?: { _id?: string; slug?: string; title?: string } | string;
+    date?: string; // 'YYYY-MM-DD'
+    startAt?: string;
 }
 
 // Lista de géneros
@@ -66,6 +75,7 @@ export default function HomePage() {
     const [selectedGenre, setSelectedGenre] = useState(ALL_GENRES[0]);
     const [selectedDate, setSelectedDate] = useState("");
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
+    const [allShowtimes, setAllShowtimes] = useState<ShowtimeItem[]>([]);
     const [apiError, setApiError] = useState(false);
     const [logoClickCount, setLogoClickCount] = useState(0);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,6 +121,8 @@ export default function HomePage() {
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
                         duration: m.duration ? `${m.duration} min` : "N/A",
                         description: m.description || "",
+                        id: (m as any)._id,
+                        slug: (m as any).slug,
                     };
                 });
 
@@ -129,6 +141,28 @@ export default function HomePage() {
 
         // Refrescar automáticamente cada 15s
         const interval = setInterval(() => { if (mounted) loadMovies(); }, 15000);
+        return () => { mounted = false; clearInterval(interval); };
+    }, []);
+
+    // Cargar showtimes desde API (para poder filtrar por fecha real de funciones)
+    useEffect(() => {
+        let mounted = true;
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+        const loadShowtimes = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/showtimes`);
+                if (!res.ok) throw new Error('Error al obtener showtimes');
+                const data = await res.json();
+                if (mounted) setAllShowtimes(Array.isArray(data) ? data as ShowtimeItem[] : []);
+            } catch (err) {
+                console.warn('Error al cargar showtimes:', err);
+                if (mounted) setAllShowtimes([]);
+            }
+        };
+
+        loadShowtimes();
+        const interval = setInterval(() => { if (mounted) loadShowtimes(); }, 15000);
         return () => { mounted = false; clearInterval(interval); };
     }, []);
 
@@ -158,11 +192,34 @@ export default function HomePage() {
         }
 
         if (selectedDate) {
-            current = current.filter(m => m.releaseDate >= selectedDate);
+            // Buscar showtimes cuya fecha coincida con selectedDate (YYYY-MM-DD)
+            const dateNormalized = selectedDate;
+            const movieSlugSet = new Set<string>();
+            for (const st of allShowtimes) {
+                if (!st) continue;
+                const stDate = st.date || (st.startAt ? new Date(st.startAt).toISOString().slice(0,10) : undefined);
+                if (!stDate) continue;
+                if (stDate === dateNormalized) {
+                    // intentar obtener slug directamente
+                    if (typeof st.movie === 'string') {
+                        movieSlugSet.add(st.movie as string);
+                    } else if (st.movie && (st.movie as any).slug) {
+                        movieSlugSet.add((st.movie as any).slug);
+                    } else if (st.movie && (st.movie as any).title) {
+                        movieSlugSet.add(createSlug((st.movie as any).title));
+                    }
+                }
+            }
+
+            // Filtrar películas que tengan showtime en esa fecha (chequear slug o generar slug del título)
+            current = current.filter(m => {
+                const movieSlug = (m.slug && String(m.slug).trim()) || createSlug(m.title || '');
+                return movieSlugSet.size === 0 ? false : movieSlugSet.has(movieSlug);
+            });
         }
 
         return current;
-    }, [allMovies, searchTerm, selectedGenre, selectedDate]);
+    }, [allMovies, searchTerm, selectedGenre, selectedDate, allShowtimes]);
 
     const handleLogoClick = () => {
         setLogoClickCount(prev => {
@@ -196,9 +253,26 @@ export default function HomePage() {
                     </section>
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {filteredMovies.length > 0 ? (
-                        filteredMovies.map((movie, index) => (
-                            <MovieCard key={movie.title + index} {...movie} />
-                        ))
+                        filteredMovies.map((movie, index) => {
+                            // Calcular cantidad de funciones para esta película
+                            const count = allShowtimes.filter(st => {
+                                if (!st) return false;
+                                const movieId = (movie as any).id;
+                                // Preferir match por _id si está disponible
+                                if (movieId) {
+                                    if (typeof st.movie === 'string') return String(st.movie) === String(movieId);
+                                    if (st.movie && (st.movie as any)._id) return String((st.movie as any)._id) === String(movieId);
+                                }
+                                // Fallback: match por slug
+                                const movieSlug = (movie as any).slug || createSlug(movie.title || '');
+                                if (typeof st.movie === 'string') return String(st.movie) === String(movieSlug);
+                                if (st.movie && (st.movie as any).slug) return String((st.movie as any).slug) === String(movieSlug);
+                                if (st.movie && (st.movie as any).title) return createSlug((st.movie as any).title) === movieSlug;
+                                return false;
+                            }).length;
+
+                            return <MovieCard key={movie.title + index} {...movie} showtimesCount={count} />
+                        })
                     ) : (
                         <div className="col-span-full text-center">
                             {apiError ? (

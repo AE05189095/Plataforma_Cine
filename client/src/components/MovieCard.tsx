@@ -24,9 +24,10 @@ interface MovieCardProps {
     duration: string;
     description: string;
     isUpcoming?: boolean; 
+    showtimesCount?: number;
 }
 
-export default function MovieCard({ title, image, rating, score, genre, duration, description, isUpcoming }: MovieCardProps) {
+export default function MovieCard({ title, image, rating, score, genre, duration, description, isUpcoming, showtimesCount }: MovieCardProps) {
     const router = useRouter();
     const [isHovered, setIsHovered] = useState(false);
     
@@ -129,7 +130,13 @@ export default function MovieCard({ title, image, rating, score, genre, duration
                     hover:from-red-700 hover:to-orange-600
                 `}
             >
-                <span className="text-base font-bold">5 funciones disponibles</span>
+                <span className="text-base font-bold">
+                    {typeof showtimesCount === 'number' ? (
+                        showtimesCount === 0 ? 'Sin funciones disponibles' : `${showtimesCount} función${showtimesCount === 1 ? '' : 'es'} disponible${showtimesCount === 1 ? '' : 's'}`
+                    ) : (
+                        'Funciones disponibles'
+                    )}
+                </span>
             </button>
             
         </div>

@@ -27,7 +27,7 @@
     "mongoose": "^8.19.1",
     "nodemailer": "^7.0.9",
     "socket.io": "^4.8.1",
-    "stripe": "^19.1.0"
+    "stripe": "^19.3.0"
   },
   "devDependencies": {
     "jest": "^30.2.0",
