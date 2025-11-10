@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 // Tipos
 interface RawMovie {
+    _id?: string;
     title?: string;
     slug?: string;
     posterUrl?: string;
@@ -34,9 +35,15 @@ interface MovieData {
     isUpcoming?: boolean;
 }
 
+interface ShowtimeMovie {
+    _id?: string;
+    slug?: string;
+    title?: string;
+}
+
 interface ShowtimeItem {
     _id?: string;
-    movie?: { _id?: string; slug?: string; title?: string } | string;
+    movie?: ShowtimeMovie | string;
     date?: string; // 'YYYY-MM-DD'
     startAt?: string;
 }
@@ -121,8 +128,8 @@ export default function HomePage() {
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
                         duration: m.duration ? `${m.duration} min` : "N/A",
                         description: m.description || "",
-                        id: (m as any)._id,
-                        slug: (m as any).slug,
+                        id: m._id,
+                        slug: m.slug,
                     };
                 });
 
@@ -139,12 +146,12 @@ export default function HomePage() {
 
         loadMovies();
 
-        // Refrescar automáticamente cada 15s
+        // Refrescar automáticamente cada 3s (ajustado según tu versión)
         const interval = setInterval(() => { if (mounted) loadMovies(); }, 3000);
         return () => { mounted = false; clearInterval(interval); };
     }, []);
 
-    // Cargar showtimes desde API (para poder filtrar por fecha real de funciones)
+    // Cargar showtimes desde API
     useEffect(() => {
         let mounted = true;
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -192,28 +199,26 @@ export default function HomePage() {
         }
 
         if (selectedDate) {
-            // Buscar showtimes cuya fecha coincida con selectedDate (YYYY-MM-DD)
             const dateNormalized = selectedDate;
             const movieSlugSet = new Set<string>();
+
             for (const st of allShowtimes) {
                 if (!st) continue;
-                const stDate = st.date || (st.startAt ? new Date(st.startAt).toISOString().slice(0,10) : undefined);
+                const stDate = st.date || (st.startAt ? new Date(st.startAt).toISOString().slice(0, 10) : undefined);
                 if (!stDate) continue;
                 if (stDate === dateNormalized) {
-                    // intentar obtener slug directamente
                     if (typeof st.movie === 'string') {
-                        movieSlugSet.add(st.movie as string);
-                    } else if (st.movie && (st.movie as any).slug) {
-                        movieSlugSet.add((st.movie as any).slug);
-                    } else if (st.movie && (st.movie as any).title) {
-                        movieSlugSet.add(createSlug((st.movie as any).title));
+                        movieSlugSet.add(st.movie);
+                    } else if (st.movie?.slug) {
+                        movieSlugSet.add(st.movie.slug);
+                    } else if (st.movie?.title) {
+                        movieSlugSet.add(createSlug(st.movie.title));
                     }
                 }
             }
 
-            // Filtrar películas que tengan showtime en esa fecha (chequear slug o generar slug del título)
             current = current.filter(m => {
-                const movieSlug = (m.slug && String(m.slug).trim()) || createSlug(m.title || '');
+                const movieSlug = m.slug?.trim() || createSlug(m.title);
                 return movieSlugSet.size === 0 ? false : movieSlugSet.has(movieSlug);
             });
         }
@@ -243,35 +248,34 @@ export default function HomePage() {
             />
 
             <main className="container mx-auto p-4 sm:p-8">
-               <section className="text-center pt-6 sm:pt-10 pb-10 sm:pb-16 px-4">
+                <section className="text-center pt-6 sm:pt-10 pb-10 sm:pb-16 px-4">
                     <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-orange-500 mb-3 leading-tight">
                         Cartelera CineGT
                     </h1>
                     <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
                         Disfruta del mejor cine en Guatemala con la experiencia cinematográfica más emocionante
                     </p>
-                    </section>
+                </section>
+
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {filteredMovies.length > 0 ? (
                         filteredMovies.map((movie, index) => {
-                            // Calcular cantidad de funciones para esta película
                             const count = allShowtimes.filter(st => {
                                 if (!st) return false;
-                                const movieId = (movie as any).id;
-                                // Preferir match por _id si está disponible
+                                const movieId = movie.id;
                                 if (movieId) {
-                                    if (typeof st.movie === 'string') return String(st.movie) === String(movieId);
-                                    if (st.movie && (st.movie as any)._id) return String((st.movie as any)._id) === String(movieId);
+                                    if (typeof st.movie === 'string') return st.movie === movieId;
+                                    if (st.movie?._id) return st.movie._id === movieId;
                                 }
-                                // Fallback: match por slug
-                                const movieSlug = (movie as any).slug || createSlug(movie.title || '');
-                                if (typeof st.movie === 'string') return String(st.movie) === String(movieSlug);
-                                if (st.movie && (st.movie as any).slug) return String((st.movie as any).slug) === String(movieSlug);
-                                if (st.movie && (st.movie as any).title) return createSlug((st.movie as any).title) === movieSlug;
+
+                                const movieSlug = movie.slug || createSlug(movie.title);
+                                if (typeof st.movie === 'string') return st.movie === movieSlug;
+                                if (st.movie?.slug) return st.movie.slug === movieSlug;
+                                if (st.movie?.title) return createSlug(st.movie.title) === movieSlug;
                                 return false;
                             }).length;
 
-                            return <MovieCard key={movie.title + index} {...movie} showtimesCount={count} />
+                            return <MovieCard key={movie.title + index} {...movie} showtimesCount={count} />;
                         })
                     ) : (
                         <div className="col-span-full text-center">
