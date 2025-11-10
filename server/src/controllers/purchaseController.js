@@ -385,19 +385,34 @@ exports.create = async (req, res) => {
 // ==========================================================
 exports.listByUser = async (req, res) => {
   try {
-    const userId = req.user?._id;
-    const purchases = await Purchase.find({ user: userId })
-      .populate({
-        path: 'showtime',
-        populate: [
-          { path: 'movie', model: 'Movie' },
-          { path: 'hall', model: 'Hall' },
-        ],
-      })
-      .sort({ createdAt: -1 })
-      .lean();
+    const authUserId = req.user?._id;
+    if (!authUserId) return res.status(401).json({ message: 'No autenticado' });
 
-    res.json(purchases);
+    // Soporta /user/me y valida acceso directo a /user/:userId
+    const requestedId = req.params?.userId;
+    if (requestedId && requestedId !== 'me' && String(requestedId) !== String(authUserId)) {
+      return res.status(403).json({ message: 'No autorizado para ver compras de otro usuario' });
+    }
+
+    let purchases;
+    try {
+      purchases = await Purchase.find({ user: authUserId })
+        .populate({
+          path: 'showtime',
+          populate: [
+            { path: 'movie', model: 'Movie' },
+            { path: 'hall', model: 'Hall' },
+          ],
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+      return res.json(purchases);
+    } catch (popErr) {
+      console.error('Error populating user purchases, returning unpopulated data:', popErr?.message || popErr);
+      // Fallback sin populate para evitar 500 por datos inconsistentes (p.ej. showtime no-ObjectId)
+      const basic = await Purchase.find({ user: authUserId }).sort({ createdAt: -1 }).lean();
+      return res.json(basic);
+    }
   } catch (err) {
     console.error('Error listing user purchases:', err);
     res.status(500).json({ message: 'Error al obtener las compras' });

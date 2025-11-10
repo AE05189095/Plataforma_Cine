@@ -256,17 +256,17 @@ export default function MovieDetailPage() {
                 const saved = window.localStorage.getItem('CineGT_filterDate') || '';
                 setFilterDate(saved);
             }
-        } catch (e) {}
+        } catch {}
 
-        const onChange = (ev: any) => {
-            try {
-                const v = ev && ev.detail ? ev.detail : '';
-                setFilterDate(v || '');
-            } catch (e) {}
+        // Evento personalizado para cambio de filtro de fecha.
+        type FilterDateChangedEvent = CustomEvent<string | undefined>;
+        const onChange = (ev: Event) => {
+            const v = (ev as FilterDateChangedEvent).detail || '';
+            setFilterDate(v);
         };
-        (document as any).addEventListener('CineGT_filterDateChanged', onChange);
+        document.addEventListener('CineGT_filterDateChanged', onChange);
         return () => {
-            try { (document as any).removeEventListener('CineGT_filterDateChanged', onChange); } catch (e) {}
+            try { document.removeEventListener('CineGT_filterDateChanged', onChange); } catch {}
         };
     }, []);
 
@@ -507,7 +507,7 @@ export default function MovieDetailPage() {
                                     onChange={(e) => {
                                         const v = e.target.value;
                                         setFilterDate(v || '');
-                                        try { if (typeof window !== 'undefined' && window.localStorage) { if (v) window.localStorage.setItem('CineGT_filterDate', v); else window.localStorage.removeItem('CineGT_filterDate'); } } catch (err) {}
+                                        try { if (typeof window !== 'undefined' && window.localStorage) { if (v) window.localStorage.setItem('CineGT_filterDate', v); else window.localStorage.removeItem('CineGT_filterDate'); } } catch {}
                                     }}
                                 />
                                 <button
@@ -515,7 +515,7 @@ export default function MovieDetailPage() {
                                     title="Limpiar filtro"
                                     onClick={() => {
                                         setFilterDate('');
-                                        try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('CineGT_filterDate'); } catch (err) {}
+                                        try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('CineGT_filterDate'); } catch {}
                                     }}
                                     className="px-3 py-2 bg-amber-500 text-black rounded-md font-semibold hover:bg-amber-400"
                                 >
