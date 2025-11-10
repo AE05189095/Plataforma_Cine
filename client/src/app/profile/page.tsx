@@ -2,9 +2,16 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
-import { API_BASE, TOKEN_KEY } from "@/lib/config";
+import { API_BASE} from "@/lib/config";
 
-type User = { id: string; username: string; email: string } | null;
+// Nota: Asumimos que el token es gestionado con la clave 'app_token'
+
+type User = {
+  id: string;
+  username: string;
+  email: string;
+  role?: 'cliente' | 'admin' | 'colaborador' | string;
+} | null;
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User>(null);
@@ -22,9 +29,9 @@ export default function ProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = localStorage.getItem('app_token');
         if (!token) {
-          setError('No autenticado');
+          setError("No autenticado");
           setLoading(false);
           return;
         }
@@ -35,7 +42,7 @@ export default function ProfilePage() {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          setError(body.message || 'Error al obtener perfil');
+          setError(body.message || "Error al obtener perfil");
           setLoading(false);
           return;
         }
@@ -43,7 +50,7 @@ export default function ProfilePage() {
         const data = await res.json();
         setUser(data.user || null);
       } catch {
-        setError('Error de red');
+        setError("Error de red");
       } finally {
         setLoading(false);
       }
@@ -52,32 +59,56 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    router.push('/');
+  const handleLogout = async () => {
+    const token = localStorage.getItem('app_token');
+    if (!token) {
+      router.push("/");
+      return;
+    }
+    try {
+      // Registrar logout en el backend, usando el token en el header (lógica de semana-final)
+      const res = await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json",
+                   Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      console.log("Logout registrado:", data.message);
+    } catch (error) {
+      console.error("Error registrando logout:", error);
+    } finally {
+      // Eliminar token local y redirigir siempre
+      localStorage.removeItem('app_token');
+      router.push("/");
+    }
   };
 
   const submitChange = async () => {
     setChanging(true);
     try {
-      const token = localStorage.getItem(TOKEN_KEY);
+      const token = localStorage.getItem('app_token'); // Unificado a 'app_token'
       if (!token) throw new Error('No autenticado');
+      
       const res = await fetch(`${API_BASE}/api/auth/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ currentPassword, newPassword }),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ oldPassword: currentPassword, newPassword }),
       });
 
       const body = await res.json();
-      if (!res.ok) throw new Error(body.message || 'Error');
+      if (!res.ok) throw new Error(body.message || "Error");
 
-      alert('Contraseña cambiada correctamente');
+      alert("Contraseña cambiada correctamente");
       setShowChange(false);
-      setCurrentPassword('');
-      setNewPassword('');
+      setCurrentPassword("");
+      setNewPassword("");
     } catch (err: unknown) {
-      let msg = 'Error al cambiar contraseña';
-      if (err && typeof err === 'object' && 'message' in err) {
+      let msg = "Error al cambiar contraseña";
+      if (err && typeof err === "object" && "message" in err) {
         msg = (err as { message?: string }).message || msg;
       }
       alert(msg);
@@ -89,52 +120,103 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
       <Header />
-      <main className="p-8 max-w-3xl mx-auto">
-        <div className="bg-slate-800 p-6 rounded-lg shadow-md">
-          <h1 className="text-2xl font-bold text-amber-300 mb-4">Perfil</h1>
+      <main className="px-4 sm:px-6 md:px-8 py-8 max-w-3xl mx-auto">
+        <div className="bg-slate-800 p-5 sm:p-6 md:p-8 rounded-lg shadow-md">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-300 mb-6 text-center md:text-left">
+            Perfil
+          </h1>
 
           {loading ? (
-            <div className="text-slate-400">Cargando...</div>
+            <div className="text-slate-400 text-center">Cargando...</div>
           ) : error ? (
-            <div className="text-red-400">{error}</div>
+            <div className="text-red-400 text-center">{error}</div>
           ) : user ? (
-            <div className="space-y-3">
+            <div className="space-y-4 sm:space-y-5">
               <div>
-                <div className="text-slate-400 text-sm">Nombre de Usuario</div>
-                <div className="font-semibold text-white">{user.username}</div>
+                <div className="text-slate-400 text-sm sm:text-base">Nombre de Usuario</div>
+                <div className="font-semibold text-white text-base sm:text-lg">{user.username}</div>
               </div>
 
               <div>
-                <div className="text-slate-400 text-sm">Correo</div>
-                <div className="font-semibold text-white">{user.email}</div>
+                <div className="text-slate-400 text-sm sm:text-base">Correo</div>
+                <div className="font-semibold text-white text-base sm:text-lg">{user.email}</div>
               </div>
 
               <div>
-                <div className="text-slate-400 text-sm">Contraseña</div>
+                <div className="text-slate-400 text-sm sm:text-base">Contraseña</div>
                 <div className="font-semibold text-white">***********</div>
               </div>
 
-              <div className="flex gap-3">
-                <button onClick={() => setShowChange(true)} className="px-4 py-2 bg-amber-500 text-black rounded">Cambiar contraseña</button>
-                <button onClick={handleLogout} className="px-4 py-2 bg-red-600 rounded">Cerrar sesión</button>
+              {/* Enlace al historial: solo visible para clientes (no admin/colaborador) */}
+              {(!user?.role || (user.role !== 'admin' && user.role !== 'colaborador')) && (
+                <div className="mt-4">
+                  <a
+                    href="/profile/UserHistory"
+                    className="text-amber-400 underline text-sm sm:text-base"
+                  >
+                    Ver historial de entradas
+                  </a>
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex flex-col sm:flex-row gap-3 mt-5">
+                <button
+                  onClick={() => setShowChange(true)}
+                  className="px-4 py-2 md:px-5 md:py-3 bg-amber-500 text-black rounded text-sm md:text-base font-semibold hover:bg-amber-400 transition"
+                >
+                  Cambiar contraseña
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 md:px-5 md:py-3 bg-red-600 rounded text-sm md:text-base font-semibold hover:bg-red-500 transition"
+                >
+                  Cerrar sesión
+                </button>
               </div>
 
               {showChange && (
-                <div className="mt-4 bg-gray-900 p-4 rounded">
-                  <div className="mb-2 text-slate-300">Ingresa tu contraseña actual y la nueva:</div>
-                  <input type="password" placeholder="Contraseña actual" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full mb-2 p-2 rounded bg-slate-800" />
-                  <input type="password" placeholder="Nueva contraseña" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full mb-2 p-2 rounded bg-slate-800" />
-                  <div className="flex gap-2">
-                    <button onClick={submitChange} disabled={changing} className="px-4 py-2 bg-amber-500 text-black rounded">{changing ? 'Guardando...' : 'Guardar'}</button>
-                    <button onClick={() => setShowChange(false)} className="px-4 py-2 bg-gray-700 rounded">Cancelar</button>
+                <div className="mt-5 bg-gray-900 p-4 sm:p-6 rounded-lg">
+                  <div className="mb-3 text-slate-300 text-sm sm:text-base">
+                    Ingresa tu contraseña actual y la nueva:
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="Contraseña actual"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full mb-3 p-2 sm:p-3 rounded bg-slate-800 text-sm sm:text-base"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Nueva contraseña"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full mb-3 p-2 sm:p-3 rounded bg-slate-800 text-sm sm:text-base"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={submitChange}
+                      disabled={changing}
+                      className="px-4 py-2 md:px-5 md:py-3 bg-amber-500 text-black rounded text-sm md:text-base font-semibold hover:bg-amber-400 transition"
+                    >
+                      {changing ? "Guardando..." : "Guardar"}
+                    </button>
+                    <button
+                      onClick={() => setShowChange(false)}
+                      className="px-4 py-2 md:px-5 md:py-3 bg-gray-700 rounded text-sm md:text-base font-semibold hover:bg-gray-600 transition"
+                    >
+                      Cancelar
+                    </button>
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-slate-400">No hay datos de usuario disponibles.</div>
+            <div className="text-slate-400 text-center">
+              No hay datos de usuario disponibles.
+            </div>
           )}
-
         </div>
       </main>
     </div>

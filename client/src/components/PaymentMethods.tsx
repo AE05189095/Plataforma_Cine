@@ -1,67 +1,151 @@
 "use client";
 import React, { useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { formatCurrency } from '@/lib/format';
+import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { API_BASE, TOKEN_KEY } from '@/lib/config';
 
-import { normalizePaymentPayload } from '@/lib/payment';
-
-type CardInfo = { number: string; name: string; exp: string; cvc: string };
-type PaymentPayload = { method: 'card' | 'paypal'; card?: CardInfo; paypal?: { email: string } };
 
 type Props = {
   amount: number | string;
   onCancel: () => void;
-  onConfirm: (paymentInfo: PaymentPayload) => Promise<void>;
+  showtimeId: string;
+  seatsSelected?: string[];
+  onConflict?: (conflictSeats: string[], message?: string) => void;
 };
 
-export default function PaymentMethods({ amount, onCancel, onConfirm }: Props) {
-  const [method, setMethod] = useState<'card' | 'paypal'>('card');
-  const [cardNumber, setCardNumber] = useState('');
+const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
+
+function PaymentForm({ amount, onCancel, showtimeId, seatsSelected, onConflict }: Props) {
   const [cardName, setCardName] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [paypalEmail, setPaypalEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [method, setMethod] = useState<'card'|'paypal'>('card');
+  const [error, setError] = useState<string | null>(null);
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isRestrictedRole, setIsRestrictedRole] = useState<boolean>(false);
 
-  // Helpers to manage formatting
-  const onlyDigits = (v: string) => v.replace(/\D/g, '');
-
-  const formatCardNumber = (value: string) => {
-    const digits = onlyDigits(value).slice(0, 19); // limitar a 19 dígitos max
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-  };
-
-  const formatExp = (value: string) => {
-    const digits = onlyDigits(value).slice(0, 4);
-    if (digits.length <= 2) return digits;
-    return `${digits.slice(0,2)}/${digits.slice(2)}`;
-  };
-
-  // Validación relajada para modo demo: aceptar cualquier tarjeta inventada siempre que haya nombre y algunos dígitos
-  const validate = () => {
-    if (method === 'card') {
-      const digits = onlyDigits(cardNumber);
-      return cardName.trim().length > 0 && digits.length >= 6 && cardCvc.trim().length >= 2 && cardExp.trim().length >= 3;
+  React.useEffect(() => {
+    try {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) { setIsRestrictedRole(false); return; }
+      const payloadStr = token.split('.')[1];
+      const decoded = atob(payloadStr.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(decodeURIComponent(decoded.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+      const role = payload?.role || 'cliente';
+      setIsRestrictedRole(role === 'admin' || role === 'colaborador');
+    } catch {
+      setIsRestrictedRole(false);
     }
-    // PayPal: aceptar cualquier entrada no vacía (modo demo)
-    return paypalEmail.trim().length > 3;
-  };
+  }, []);
 
   const handleConfirm = async () => {
-    if (!validate()) return alert('Completa los datos de pago correctamente');
-    setLoading(true);
-    try {
-      // Build raw payload then normalize to a stable shape before sending to parent
-      const raw: PaymentPayload = { method };
-      if (method === 'card') raw.card = { number: cardNumber.replace(/\s+/g, ''), name: cardName, exp: cardExp, cvc: cardCvc };
-      else raw.paypal = { email: paypalEmail };
+    if (method !== 'card' || !stripe || !elements) {
+      if (method === 'paypal') alert('PayPal no implementado en esta versión');
+      return;
+    }
 
-      const normalized = normalizePaymentPayload(raw as any);
-      await onConfirm(normalized as any);
-    } catch (e) {
-      console.error(e);
-      alert('Error procesando el pago');
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!publishableKey) {
+        throw new Error(
+          'La clave publicable de Stripe no está configurada. Asegúrate de que NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY esté en tu archivo .env.local y reinicia el servidor.'
+        );
+      }
+
+      const cardNumberElement = elements.getElement(CardNumberElement);
+      if (!cardNumberElement) {
+        throw new Error("El componente de tarjeta no está listo.");
+      }
+
+      // 1. Crear un PaymentMethod en el frontend de forma segura
+      const { paymentMethod, error: pmError } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardNumberElement,
+        billing_details: {
+          name: cardName,
+        },
+      });
+
+      if (pmError || !paymentMethod) {
+        throw new Error(pmError?.message || 'Error al validar la tarjeta.');
+      }
+
+      // 2. Enviar el paymentMethod.id al backend para procesar el pago
+      const chargeRes = await fetch(`${API_BASE}/api/payments/charge-with-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+        body: JSON.stringify({
+          amount: amount,
+          currency: 'GTQ',
+          paymentMethodId: paymentMethod.id,
+          metadata: { showtimeId: showtimeId || '', seats: (seatsSelected || []).join(',') },
+        }),
+      });
+
+      const chargeData = await chargeRes.json();
+      if (!chargeRes.ok) {
+        throw new Error(chargeData.message || 'Error procesando el pago.');
+      }
+
+      const paymentIntentId = chargeData.paymentIntentId;
+      if (!paymentIntentId) throw new Error('El servidor no retornó un ID de pago.');
+
+      // 3. Registrar la compra en la base de datos
+      const purchaseRes = await fetch(`${API_BASE}/api/purchases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` },
+        body: JSON.stringify({
+          paymentIntentId,
+          showtimeId: showtimeId,
+          seats: seatsSelected || [],
+        }),
+      });
+
+      if (!purchaseRes.ok) {
+        const purchaseError = await purchaseRes.json().catch(() => ({ message: 'Error creando el registro de la compra.' }));
+        const message = purchaseError.message || 'Error creando el registro de la compra.';
+        // Si es conflicto por asientos bloqueados/ocupados, notificar al mapa y cerrar modal
+        if (purchaseRes.status === 409 && onConflict) {
+          try {
+            onConflict(seatsSelected || [], message);
+          } catch {}
+          onCancel();
+          return;
+        }
+        throw new Error(message);
+      }
+
+      const purchaseData = await purchaseRes.json();
+
+      // 4. Éxito y redirección
+      window.location.href = `/compra-exitosa?purchase_id=${purchaseData.purchase._id}`;
+
+    } catch (err) {
+      console.error('Error en pago:', err);
+      setError(err instanceof Error ? err.message : 'Error procesando pago');
     } finally {
       setLoading(false);
     }
+  };
+
+  const elementOptions = {
+    style: {
+      base: {
+        color: '#ffffff',
+        fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+        fontSmoothing: 'antialiased',
+        fontSize: '16px',
+        '::placeholder': {
+          color: '#a0aec0',
+        },
+      },
+      invalid: { color: '#f56565', iconColor: '#f56565' },
+    },
   };
 
   return (
@@ -69,58 +153,89 @@ export default function PaymentMethods({ amount, onCancel, onConfirm }: Props) {
       <div className="absolute inset-0 bg-black/70" onClick={onCancel} />
       <div className="relative bg-gray-900 text-white rounded-xl shadow-xl w-full max-w-lg p-6">
         <h3 className="text-xl font-semibold mb-3">Selecciona método de pago</h3>
-  <div className="text-sm text-gray-300 mb-4">Total a pagar: <span className="text-amber-300 font-semibold">{amount}</span></div>
+        <div className="text-sm text-gray-300 mb-4">
+          Total a pagar: <span className="text-amber-300 font-semibold">{formatCurrency(amount)}</span>
+        </div>
 
         <div className="flex gap-2 mb-4">
-          <button className={`px-3 py-2 rounded ${method === 'card' ? 'bg-red-600' : 'bg-gray-800'}`} onClick={() => setMethod('card')}>Tarjeta de crédito</button>
-          <button className={`px-3 py-2 rounded ${method === 'paypal' ? 'bg-red-600' : 'bg-gray-800'}`} onClick={() => setMethod('paypal')}>PayPal</button>
+          <button 
+            className={`px-3 py-2 rounded ${method === 'card' ? 'bg-red-600' : 'bg-gray-800'}`} 
+            onClick={() => setMethod('card')}
+          >
+            Tarjeta de crédito
+          </button>
+          <button 
+            className={`px-3 py-2 rounded ${method === 'paypal' ? 'bg-red-600' : 'bg-gray-800'}`} 
+            onClick={() => setMethod('paypal')}
+          >
+            PayPal
+          </button>
         </div>
 
         {method === 'card' ? (
           <div className="space-y-2">
-            <input
-              className="w-full p-2 rounded bg-gray-800"
-              placeholder="Nombre en la tarjeta"
-              value={cardName}
-              onChange={(e) => setCardName(e.target.value)}
-            />
-            <input
-              className="w-full p-2 rounded bg-gray-800"
-              placeholder="Número de tarjeta"
-              inputMode="numeric"
-              value={cardNumber}
-              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-            />
+            <input className="w-full p-2 rounded bg-gray-800" placeholder="Nombre en la tarjeta" value={cardName} onChange={(e) => setCardName(e.target.value)} autoComplete="cc-name" />
+            <div className="w-full p-2 rounded bg-gray-800"><CardNumberElement options={elementOptions} /></div>
             <div className="grid grid-cols-2 gap-2">
-              <input
-                className="p-2 rounded bg-gray-800"
-                placeholder="MM/YY"
-                inputMode="numeric"
-                value={cardExp}
-                onChange={(e) => setCardExp(formatExp(e.target.value))}
-              />
-              <input
-                className="p-2 rounded bg-gray-800"
-                placeholder="CVC"
-                inputMode="numeric"
-                value={cardCvc}
-                onChange={(e) => setCardCvc(onlyDigits(e.target.value).slice(0,4))}
-              />
+              <div className="p-2 rounded bg-gray-800"><CardExpiryElement options={elementOptions} /></div>
+              <div className="p-2 rounded bg-gray-800"><CardCvcElement options={elementOptions} /></div>
             </div>
-            <div className="text-xs text-gray-400">Los datos de tarjeta no se procesan realmente (modo demo). Se aceptan tarjetas inventadas.</div>
+            {error && <div className="text-red-400 text-sm mt-2">{error}</div>}
           </div>
         ) : (
           <div className="space-y-2">
-            <input className="w-full p-2 rounded bg-gray-800" placeholder="Email de PayPal" value={paypalEmail} onChange={(e) => setPaypalEmail(e.target.value)} />
-            <div className="text-xs text-gray-400">Se simula pago por PayPal; no hay redirección real.</div>
+            <input 
+              className="w-full p-2 rounded bg-gray-800" 
+              placeholder="Email de PayPal" 
+              onChange={() => {}} 
+            />
+            <div className="text-xs text-gray-400">
+              PayPal no implementado en esta versión.
+            </div>
           </div>
         )}
 
         <div className="mt-4 flex justify-end gap-2">
-          <button className="px-4 py-2 rounded bg-gray-700" onClick={onCancel} disabled={loading}>Cancelar</button>
-          <button className="px-4 py-2 rounded bg-red-600" onClick={handleConfirm} disabled={loading}>{loading ? 'Procesando...' : 'Confirmar compra'}</button>
+          <button 
+            className="px-4 py-2 rounded bg-gray-700" 
+            onClick={onCancel} 
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button 
+            className="px-4 py-2 rounded bg-red-600" 
+            onClick={handleConfirm} 
+            disabled={loading || isRestrictedRole}
+            title={isRestrictedRole ? 'No disponible para administradores o colaboradores.' : undefined}
+          >
+            {loading ? 'Procesando...' : 'Confirmar compra'}
+          </button>
         </div>
+        {isRestrictedRole && (
+          <div className="mt-2 text-sm text-red-400">
+            Las compras están deshabilitadas para administradores y colaboradores.
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+export default function PaymentMethodsWrapper(props: Props) {
+  if (!stripePromise) {
+    console.error("Stripe publishable key is not available.");
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/70" />
+            <div className="relative bg-gray-900 text-white rounded-xl shadow-xl w-full max-w-lg p-6">
+                <h3 className="text-xl font-semibold text-red-400">Error de Configuración</h3>
+                <p className="text-gray-300 mt-2">La clave de Stripe no está configurada en el cliente. Revisa el archivo `.env.local`.</p>
+            </div>
+        </div>
+    );
+  }
+  return (
+    <Elements stripe={stripePromise}><PaymentForm {...props} /></Elements>
   );
 }

@@ -3,29 +3,27 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Usar la paleta coherente con la página de inicio */
+  /* Fondo: gradiente oscuro; Foreground: claro; Primary: naranja */
+  --background: linear-gradient(180deg, #000000 0%, #0b1220 50%, #000000 100%);
+  --foreground: #ffffff;
 
-  /* Ya no son estrictamente necesarios aquí, pero los mantenemos */
-  --color-primary: #dc2626;  
-  --color-link: #f87171;    
+  --color-primary: #f97316; /* Tailwind orange-500 */
+  --color-link: #fb923c;    /* naranja claro */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* Removed unknown @theme at-rule which caused a lint error. The variables
+   below reference the same names and are safe to use directly. If you rely
+   on custom theme tooling, reintroduce appropriately. */
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Estos colores están definidos, pero las clases de Tailwind en page.tsx tienen prioridad. */
-    --background: #0a0a0a; 
-    --foreground: #ededed;
-    
-    --color-primary: #dc2626; 
-    --color-link: #f87171;
+    :root {
+    /* Dark-mode fallback — mantener la misma paleta oscura/ naranja */
+    --background: linear-gradient(180deg, #000000 0%, #0b1220 50%, #000000 100%);
+    --foreground: #ffffff;
+
+    --color-primary: #f97316;
+    --color-link: #fb923c;
   }
 }
 
@@ -34,4 +32,25 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Forzar cajas/modales y tarjetas a paleta oscura */
+.card, .panel, .modal, .dialog, .toast, .center-card {
+  background: rgba(6,8,12,0.75);
+  color: var(--foreground);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+/* Forzar íconos de date/time a ser blancos en fondos oscuros */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE y Edge */
 }

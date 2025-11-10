@@ -1,19 +1,54 @@
-// src/app/movies/[slug]/page.tsx
-
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
+import { io, Socket } from 'socket.io-client';
 import { API_BASE } from '@/lib/config';
 import { getPriceForHall } from '@/lib/pricing';
 import Header from "@/components/Header";
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 
-// FUNCION DE SLUG (para usar en el cliente si es necesario)
+// ==========================================================
+// 🛑 MAPEO DE IMÁGENES EXACTAS
+// ==========================================================
+
+const IMAGE_MAP: Record<string, string> = {
+    "the-shawshank-redemption": "/images/the-shawshank-redemption.jpg",
+    "interstellar": "/images/interstellar.jpg",
+    "parasite": "/images/parasite.jpg",
+    "la-la-land": "/images/la-la-land.jpg",
+    "incepcion": "/images/incepcion.jpg",
+    "200-lobo": "/images/lobo_200.jpg",
+};
+
+// ==========================================================
+// CONSTANTES DE PRÓXIMO ESTRENO
+// ==========================================================
+
+const LOBO_SLUG = '200-lobo'; 
+const UPCOMING_SLUG = 'proximamente';
+const UPCOMING_DISPLAY_DATE = '25 de Diciembre de 2025'; // Fecha de estreno para mostrar
+
+const UPCOMING_MOVIE_DATA: MovieData = {
+    title: '200% Lobo',
+    image: IMAGE_MAP[LOBO_SLUG] || '/images/lobo_200.jpg',
+    rating: 'G',
+    score: 5.0,
+    genre: 'Animación, Aventura',
+    duration: '90 min',
+    description: 'Freddy, heredero de una noble y heroica familia de hombres lobo, se convierte en un caniche en su 13º cumpleaños, ¡convirtiéndose en la vergüenza de la familia! Con un límite de tiempo, debe demostrar que tiene el corazón de un lobo, o será desterrado para siempre.',
+    slug: LOBO_SLUG,
+    isUpcoming: true,
+};
+
+// ==========================================================
+// FUNCIONES Y TIPOS
+// ==========================================================
+
+// FUNCION DE SLUG
 const createSlug = (title: string): string => {
     return title
-        .toLowerCase()
-        .trim()
+        .toLowerCase().trim()
         .replace(/[^\w\s-]/g, '')
         .replace(/[\s_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
@@ -37,6 +72,7 @@ interface MovieData {
     duration?: string;
     description?: string;
     slug: string;
+    _id?: string;
     isUpcoming?: boolean; 
 }
 
@@ -55,29 +91,35 @@ interface RawMovieResponse {
 
 // FUNCION PARA OBTENER LA URL DE LA IMAGEN
 const getImageURL = (movie: MovieData): string => {
-    let imagePath = '';
-    
-    // 1. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
-    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
-        imagePath = movie.image;
-    }
-    
-    // 2. Si no hay posterUrl válido, usar el slug
-    if (!imagePath || imagePath.includes('movie-default.svg')) {
-        const slug = movie.slug || createSlug(movie.title);
-        // Asume que el archivo local es [slug].jpg. CAMBIA .jpg si usas .png o .webp
-        imagePath = `${slug}.jpg`; 
-    }
+    const slug = movie.slug || createSlug(movie.title || '');
 
-    // 3. Procesar y devolver la ruta final relativa a /public/images/
-    if (imagePath && !imagePath.startsWith('http')) {
-        const filename = imagePath.split('/').pop() || imagePath;
-        return `/images/${filename.toLowerCase()}`; 
+    // 1. 🛑 PRIORIDAD AL MAPEO MANUAL por slug (Garantiza el éxito local)
+    if (IMAGE_MAP[slug]) {
+        return IMAGE_MAP[slug];
+    }
+    
+    // 2. Intentar obtener de la propiedad 'image' (que viene de posterUrl de la API)
+    if (typeof movie.image === 'string' && movie.image.trim() !== '' && !movie.image.includes('movie-default.svg')) {
+        // Si el path de la API es un URL completo, lo devolvemos
+        if (movie.image.startsWith('http')) return movie.image;
+
+        // Si es solo el nombre del archivo, construimos la ruta estática
+        const filename = movie.image.split('/').pop() || movie.image;
+        return `/images/${filename.toLowerCase()}`;
+    }
+    
+    // 3. Fallback al slug automático
+    if (slug) {
+        return `/images/${slug.toLowerCase()}.jpg`; 
     }
 
     // 4. Fallback final
     return '/images/movie-default.svg';
 };
+
+// ==========================================================
+// COMPONENTE PRINCIPAL
+// ==========================================================
 
 export default function MovieDetailPage() {
     const params = useParams();
@@ -89,35 +131,20 @@ export default function MovieDetailPage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     
-    // Usamos useCallback para que la función no cambie en cada render
-    const updatePosterSrc = useCallback((newSrc: string) => {
-        setPosterSrc(getImageURL({ ...movie!, image: newSrc }));
-    }, [movie]);
-
     useEffect(() => {
         if (!slug) return;
 
         const fetchData = async () => {
             setLoading(true);
 
-            // 🚨 1. LÓGICA DE EXCEPCIÓN: 200% Lobo
-            if (slug === UPCOMING_SLUG) {
+            // Si es un próximo estreno (simulación local), mostramos la info de la película
+            // pero NO generamos horarios simulados automáticamente. Todas las funciones deben
+            // provenir del backend (admin). De este modo evitamos mostrar horarios inventados.
+            if (slug === UPCOMING_SLUG || slug === LOBO_SLUG) {
                 setMovie(UPCOMING_MOVIE_DATA);
-                
-                // 🚨 CORRECCIÓN DE TIPADO EN LA LÍNEA 127
-                // Se usa coalescencia nula (??) para garantizar que setPosterSrc reciba un string
-                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg'); 
-                
-                // Simulación de horarios con la fecha de estreno
-                const simulatedShowtimes: ShowTime[] = [
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 1', price: 50, availableSeats: 80, id: 'res-1', startISO: `${UPCOMING_RELEASE_DATE}T10:00:00Z` },
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 2', price: 50, availableSeats: 80, id: 'res-2', startISO: `${UPCOMING_RELEASE_DATE}T14:00:00Z` },
-                    { time: UPCOMING_DISPLAY_DATE, sala: 'Sala 3', price: 60, availableSeats: 80, id: 'res-3', startISO: `${UPCOMING_RELEASE_DATE}T18:00:00Z` },
-                ];
-                
-                setShowtimes(simulatedShowtimes);
-                setLoading(false);
-                return; // Finaliza la ejecución para el próximo estreno
+                setPosterSrc(UPCOMING_MOVIE_DATA.image ?? '/images/movie-default.svg');
+                // No hacemos 'return' aquí: dejamos que la lógica de fetch de showtimes
+                // se ejecute y muestre únicamente lo que el backend devuelva.
             }
 
             // 2. Obtener datos de la película (Lógica normal de API)
@@ -129,28 +156,33 @@ export default function MovieDetailPage() {
                     setLoading(false);
                     return;
                 }
-                const movieJson = await resMovie.json();
+                const movieJson: RawMovieResponse = await resMovie.json();
                 
                 const movieData: MovieData = {
                     title: movieJson.title || movieJson.name || 'Sin título',
                     image: movieJson.posterUrl || (movieJson.images && movieJson.images[0]) || '', // Puede estar vacío
                     rating: movieJson.rating ? String(movieJson.rating) : undefined,
                     score: (typeof movieJson.rating === 'number' && movieJson.rating) 
-                           || (typeof movieJson.score === 'number' && movieJson.score) 
-                           || undefined, 
+                                 || (typeof movieJson.score === 'number' && movieJson.score) 
+                                 || undefined, 
                     genre: movieJson.genres ? movieJson.genres.join(', ') : undefined,
                     duration: movieJson.duration ? `${movieJson.duration} min` : undefined,
                     description: movieJson.description || '',
                     slug: movieJson.slug || slug,
+                    // RawMovieResponse may not declare _id in the type; usar cast seguro
+                    _id: (movieJson as any)._id || undefined,
                 };
                 
+                // Usar getImageURL con los datos obtenidos
+                const finalPosterSrc = getImageURL(movieData);
+                
                 setMovie(movieData);
+                setPosterSrc(finalPosterSrc);
 
-                // establecer la fuente del póster (usando la nueva lógica de generación)
-                setPosterSrc(getImageURL(movieData));
 
-                // FETCH SHOWTIMES (lógica existente)
-                const resShow = await fetch(`${API_BASE}/api/showtimes`);
+                // FETCH SHOWTIMES (filtrar por película para no traer todo)
+                const movieQuery = movieData._id ? movieData._id : (movieData.slug || slug);
+                const resShow = await fetch(`${API_BASE}/api/showtimes?movie=${encodeURIComponent(movieQuery)}`);
                 const showJson = await resShow.json();
 
                 type RawShowtime = {
@@ -168,7 +200,10 @@ export default function MovieDetailPage() {
                     ? (showJson as RawShowtime[]).filter((s) => {
                         if (!s.movie) return false;
                         if (typeof s.movie === 'string') return false;
-                        return typeof s.movie === 'object' && (s.movie as { slug?: string }).slug === slug;
+                        const m = s.movie as { slug?: string; _id?: string };
+                        // aceptar match por _id (si la tenemos) o por slug
+                        if (movieData._id && m._id) return String(m._id) === String(movieData._id);
+                        return typeof m.slug === 'string' && m.slug === slug;
                     })
                     : [];
 
@@ -176,14 +211,17 @@ export default function MovieDetailPage() {
                     const start = s.startAt ? new Date(s.startAt) : null;
                     const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (s.time || '—');
                     let hallName = 'Sala';
-                    const capacity = 80;
-                    if (s.hall && typeof s.hall === 'object') {
-                        hallName = (s.hall as { name?: string }).name ?? 'Sala';
+                    // Determinar capacidad a partir de la sala si está poblada, sino fallback a 80
+                    const hallObj = s.hall && typeof s.hall === 'object' ? (s.hall as { name?: string; capacity?: number }) : null;
+                    const capacity = hallObj?.capacity ?? 80;
+                    if (hallObj) {
+                        hallName = hallObj.name ?? 'Sala';
                     } else if (typeof s.hall === 'string') {
                         hallName = s.hall;
                     }
                     const seatsBooked = Array.isArray(s.seatsBooked) ? s.seatsBooked.length : 0;
-                    const available = Math.max(0, capacity - seatsBooked);
+                    // Preferir el valor que envía el backend si está disponible
+                    const available = typeof s.availableSeats === 'number' ? s.availableSeats : Math.max(0, capacity - seatsBooked);
                     const numericPrice = getPriceForHall(hallName, s.price as number | undefined);
                     return {
                         time: timeStr,
@@ -195,29 +233,13 @@ export default function MovieDetailPage() {
                     };
                 });
 
-                // Si hay menos de 5 horarios, generar horarios adicionales
-                const ensureFive: ShowTime[] = [...mapped];
-                if (ensureFive.length < 5) {
-                    const baseDate = ensureFive[0] && ensureFive[0].startISO ? new Date(ensureFive[0].startISO as string) : new Date();
-                    let addIndex = 0;
-                    while (ensureFive.length < 5) {
-                        addIndex += 1;
-                        const d = new Date(baseDate.getTime() + addIndex * 2 * 60 * 60 * 1000); // +2h cada vez
-                        const t = d.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
-                        ensureFive.push({
-                            time: t,
-                            sala: ensureFive[0]?.sala ?? 'Sala',
-                            price: ensureFive[0]?.price ?? getPriceForHall(ensureFive[0]?.sala, undefined),
-                            availableSeats: ensureFive[0]?.availableSeats ?? 80,
-                            id: `${slug}-gen-${addIndex}`,
-                            startISO: d.toISOString(),
-                        });
-                    }
-                }
-
-                setShowtimes(ensureFive);
+                // Usar sólo los horarios reales que vienen del backend.
+                // Antes generábamos horarios "simulados" a partir del primero, lo que causaba
+                // que varias tarjetas mostraran la misma sala y disponibilidad. Eso puede confundir al usuario.
+                setShowtimes(mapped);
             } catch (err) {
                 console.error('Error fetch movie/showtimes', err);
+                setNotFound(true);
             } finally {
                 setLoading(false);
             }
@@ -225,6 +247,145 @@ export default function MovieDetailPage() {
 
         fetchData();
     }, [slug]);
+
+    // Real-time updates: escuchar eventos de showtimes para refrescar la vista automáticamente
+    useEffect(() => {
+        if (!slug) return;
+        // conectar socket una sola vez y mantener referencia
+        const socket: Socket = io(API_BASE, { transports: ['websocket', 'polling'] });
+        // guardamos socket en ref para poder usarlo en otros efectos si hace falta
+        (window as any).__client_movie_socket = (window as any).__client_movie_socket || socket;
+
+        const handleCreated = (st: any) => {
+            try {
+                if (!st || !st.movie) return;
+                // Preferir comparación por _id si la película local lo tiene, sino por slug
+                const localMovieId = movie?._id;
+                const m = typeof st.movie === 'object' ? st.movie : null;
+                if (localMovieId && m && m._id) {
+                    if (String(m._id) !== String(localMovieId)) return;
+                } else {
+                    const movieSlug = m && m.slug ? m.slug : null;
+                    if (movieSlug !== slug) return;
+                }
+                // mapear showtime entrante al formato local
+                const start = st.startAt ? new Date(st.startAt) : null;
+                const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (st.time || '—');
+                const hallObj = st.hall && typeof st.hall === 'object' ? st.hall : null;
+                const capacity = hallObj?.capacity ?? 80;
+                const seatsBooked = Array.isArray(st.seatsBooked) ? st.seatsBooked.length : 0;
+                const available = typeof st.availableSeats === 'number' ? st.availableSeats : Math.max(0, capacity - seatsBooked);
+                const numericPrice = getPriceForHall(hallObj?.name ?? 'Sala', st.price as number | undefined);
+                const mapped = {
+                    time: timeStr,
+                    sala: hallObj?.name ?? (typeof st.hall === 'string' ? st.hall : 'Sala'),
+                    price: numericPrice,
+                    availableSeats: available,
+                    id: st._id,
+                    startISO: start ? start.toISOString() : undefined,
+                };
+                setShowtimes(prev => {
+                    // evitar duplicados
+                    if (prev.some(x => x.id === mapped.id)) return prev;
+                    return [...prev, mapped].sort((a,b) => (a.startISO && b.startISO) ? new Date(a.startISO).getTime() - new Date(b.startISO).getTime() : 0);
+                });
+            } catch (e) { console.warn('Error manejando showtimeCreated socket', e); }
+        };
+
+        const handleUpdated = (st: any) => {
+            try {
+                if (!st || !st.movie) return;
+                const localMovieId = movie?._id;
+                const m = typeof st.movie === 'object' ? st.movie : null;
+                if (localMovieId && m && m._id) {
+                    if (String(m._id) !== String(localMovieId)) return;
+                } else {
+                    const movieSlug = m && m.slug ? m.slug : null;
+                    if (movieSlug !== slug) return;
+                }
+                const start = st.startAt ? new Date(st.startAt) : null;
+                const timeStr = start ? start.toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' }) : (st.time || '—');
+                const hallObj = st.hall && typeof st.hall === 'object' ? st.hall : null;
+                const capacity = hallObj?.capacity ?? 80;
+                const seatsBooked = Array.isArray(st.seatsBooked) ? st.seatsBooked.length : 0;
+                const available = typeof st.availableSeats === 'number' ? st.availableSeats : Math.max(0, capacity - seatsBooked);
+                const numericPrice = getPriceForHall(hallObj?.name ?? 'Sala', st.price as number | undefined);
+                const mapped = {
+                    time: timeStr,
+                    sala: hallObj?.name ?? (typeof st.hall === 'string' ? st.hall : 'Sala'),
+                    price: numericPrice,
+                    availableSeats: available,
+                    id: st._id,
+                    startISO: start ? start.toISOString() : undefined,
+                };
+                setShowtimes(prev => prev.map(x => x.id === mapped.id ? mapped : x));
+            } catch (e) { console.warn('Error manejando showtimeUpdated socket', e); }
+        };
+
+        const handleRemoved = (payload: any) => {
+            try {
+                const id = payload && (payload.id || payload._id) ? (payload.id || payload._id) : null;
+                if (!id) return;
+                setShowtimes(prev => prev.filter(x => x.id !== id));
+            } catch (e) { console.warn('Error manejando showtimeRemoved socket', e); }
+        };
+
+        socket.on('showtimeCreated', handleCreated);
+        socket.on('showtimeUpdated', handleUpdated);
+        socket.on('showtimeRemoved', handleRemoved);
+
+        return () => {
+            socket.off('showtimeCreated', handleCreated);
+            socket.off('showtimeUpdated', handleUpdated);
+            socket.off('showtimeRemoved', handleRemoved);
+            // sólo desconectar si es la misma instancia creada aquí
+            try { socket.disconnect(); } catch (e) {}
+        };
+    }, [slug, movie]);
+
+    // Suscribirse a actualizaciones puntuales de availableSeats por showtime
+    useEffect(() => {
+        const socket: Socket | undefined = (window as any).__client_movie_socket;
+        if (!socket) return;
+
+        const subscribed = new Set<string>();
+
+        const attach = (id: string) => {
+            if (!id || subscribed.has(id)) return;
+            subscribed.add(id);
+            const ev = `updateAvailableSeats-${id}`;
+            const handler = (payload: any) => {
+                try {
+                    setShowtimes(prev => prev.map(s => {
+                        if (s.id !== id) return s;
+                        const avail = (payload && typeof payload.availableSeats === 'number') ? payload.availableSeats : (typeof payload.availableSeats === 'undefined' && Array.isArray(payload && payload.seatsBooked) ? Math.max(0, (s as any).capacity - payload.seatsBooked.length) : s.availableSeats);
+                        return { ...s, availableSeats: typeof avail === 'number' ? avail : s.availableSeats };
+                    }));
+                } catch (e) { console.warn('Error handling updateAvailableSeats payload', e); }
+            };
+            socket.on(ev, handler);
+            // store for cleanup
+            (socket as any).__movie_listeners = (socket as any).__movie_listeners || {};
+            (socket as any).__movie_listeners[ev] = handler;
+        };
+
+        const detachAll = () => {
+            const listeners = (socket as any).__movie_listeners || {};
+            Object.keys(listeners).forEach(ev => {
+                try { socket.off(ev, listeners[ev]); } catch (e) {}
+            });
+            (socket as any).__movie_listeners = {};
+        };
+
+        // Attach for current showtimes
+        for (const s of showtimes) {
+            if (s.id) attach(s.id);
+        }
+
+        return () => {
+            detachAll();
+        };
+    }, [showtimes]);
 
     if (loading) {
         return (
@@ -235,9 +396,12 @@ export default function MovieDetailPage() {
         );
     }
 
-    // Obtener la bandera isUpcoming del objeto movie (si fue cargado por la excepción)
     const isUpcoming = movie?.isUpcoming || false;
-    const upcomingReleaseText = `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}`;
+    // Lógica combinada para el texto de próximo estreno
+    const upcomingReleaseText = isUpcoming && (slug === LOBO_SLUG || slug === UPCOMING_SLUG) 
+        ? `Próximo gran estreno: ${UPCOMING_DISPLAY_DATE}` 
+        : `¡Próximo estreno en cines!`;
+
 
     if (notFound || !movie) {
         return (
@@ -254,7 +418,7 @@ export default function MovieDetailPage() {
             <Header />
             <div className="p-4 sm:p-8 md:p-12 lg:p-16">
                 <div className="flex flex-col md:flex-row gap-8 mb-12">
-                    {/* Contenedor de la Imagen: Ahora usa posterSrc generado por getImageURL */}
+                    {/* Contenedor de la Imagen */}
                     <div className="w-full md:w-1/3 rounded-xl shadow-2xl border-4 border-gray-700 overflow-hidden max-h-[600px]">
                         <Image
                             src={posterSrc}
@@ -278,8 +442,12 @@ export default function MovieDetailPage() {
                         <div className="flex flex-wrap gap-3 text-yellow-400 mb-6 items-center">
                             <span className="font-semibold text-lg">{movie.duration}</span>
                             <span className="px-3 py-1 bg-gray-800 rounded-full text-sm">{movie.genre}</span>
-                            <span className="px-3 py-1 bg-red-600 rounded-full text-sm font-bold">{movie.rating}</span>
-                            <span className="px-3 py-1 bg-yellow-600 rounded-full text-sm font-bold">⭐ {movie.score}</span>
+                            {/* Mostrar SOLO un rating: preferir 'score' (numérico) con estrella; si no existe, mostrar 'rating' */}
+                            {movie.score != null ? (
+                                <span className="px-3 py-1 bg-yellow-600 rounded-full text-sm font-bold">⭐ {movie.score}</span>
+                            ) : movie.rating ? (
+                                <span className="px-3 py-1 bg-red-600 rounded-full text-sm font-bold">{movie.rating}</span>
+                            ) : null}
                         </div>
                         <p className="text-gray-300 text-lg leading-relaxed">{movie.description}</p>
                     </div>
@@ -313,26 +481,47 @@ export default function MovieDetailPage() {
 // COMPONENTE SECUNDARIO
 // ==========================================================
 
-// ACTUALIZADO: Acepta la bandera isUpcoming
 function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; movieSlug: string; isUpcoming?: boolean }) {
     const router = useRouter();
 
-    // Lógica para cambiar el botón
     const buttonText = isUpcoming ? "Reservar" : "Comprar";
 
     const handleBuy = () => {
-        const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
-        router.push(`/comprar?${params.toString()}`);
+        //comprar solo si no es simulado
+        /*if (!show.id) {
+                alert("Este horario es simulado y no se puede comprar.");
+                return;
+          }
+
+            const params = new URLSearchParams({ showtimeId: show.id });
+            router.push(`/comprar?${params.toString()}`);
+        */
+      const params = new URLSearchParams({ showtimeId: show.id || `${movieSlug}-${show.time}` });
+            router.push(`/comprar?${params.toString()}`);
     };
+
+
+
+    // Mostrar hora usando startISO si está disponible para evitar inconsistencias de formato
+    let displayTime = show.time;
+    if (show.startISO) {
+        try {
+            displayTime = new Date(show.startISO).toLocaleTimeString('es-419', { hour: '2-digit', minute: '2-digit' });
+        } catch {
+            // fallback a show.time
+        }
+    }
+
+    // Limpiar nombre de sala si contiene sufijos no deseados (ej: "Sala 1 - slug-de-pelicula")
+    const salaRaw = show.sala || 'Sala';
+    const salaDisplay = typeof salaRaw === 'string' ? salaRaw.replace(/\s*-\s*[^-]+$/,'').trim() : String(salaRaw);
 
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
-            {/* Si es estreno, muestra la fecha completa, si no, solo la hora */}
-            <p className="font-extrabold text-3xl mb-1 text-red-400">{show.time}</p> 
-            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{show.sala}</span></p>
+            <p className="font-extrabold text-3xl mb-1 text-red-400">{displayTime}</p>
+            <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{salaDisplay}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
-                {/* Botón modificado para usar el texto condicional */}
                 <button onClick={handleBuy} className="px-4 py-2 bg-amber-500 text-black rounded font-semibold hover:bg-amber-400">
                     {buttonText}
                 </button>

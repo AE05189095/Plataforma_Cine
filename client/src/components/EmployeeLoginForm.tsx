@@ -19,21 +19,46 @@ export default function EmployeeLoginForm({ userType }: Props) {
     setLoading(true);
     setError("");
     try {
-  const endpoint = userType === "admin" ? `${API_BASE}/api/auth/login-admin` : `${API_BASE}/api/auth/login-colaborador`;
+      const endpoint =
+        userType === "admin"
+          ? `${API_BASE}/api/auth/login-admin`
+          : `${API_BASE}/api/auth/login-colaborador`;
+
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Credenciales inválidas");
         setLoading(false);
         return;
       }
-  localStorage.setItem(TOKEN_KEY, data.token);
-      // Redirect to welcome page
-      router.push("/welcome");
+
+      localStorage.setItem(TOKEN_KEY, data.token);
+
+      // Si venía con ?next=, respetarlo para volver a la ruta solicitada
+      try {
+        const next = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('next')
+          : null;
+        if (next) {
+          router.replace(next);
+          return;
+        }
+      } catch {}
+
+      // Redirección según tipo de usuario
+      // Usamos replace para que el botón "Atrás" no regrese a la pantalla de login
+      if (userType === "admin") {
+        router.replace("/admin/dashboard");
+      } else if (userType === "colaborador") {
+        router.replace("/admin/dashboard");
+      } else {
+        router.replace("/welcome");
+      }
     } catch {
       setError("Error de conexión. Verifica que el backend esté ejecutándose.");
     } finally {
@@ -42,28 +67,71 @@ export default function EmployeeLoginForm({ userType }: Props) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white p-6">
-      <h1 className="text-4xl font-bold mb-8 text-orange-500">
-        {userType === 'admin' ? 'Inicio de sesión de administradores' : 'Inicio de sesión de colaboradores'}
+    <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white px-4 py-10 sm:px-8">
+      <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-8 text-orange-500 text-center leading-tight">
+        {userType === "admin"
+          ? "Inicio de sesión de administradores"
+          : "Inicio de sesión de colaboradores"}
       </h1>
-      <div className="flex flex-col gap-4 w-full max-w-md">
-        <div className="w-full p-8 bg-gray-900 rounded-xl border border-gray-700 shadow-2xl">
-          {error && <div className="mb-4 text-red-400">{error}</div>}
+
+      <div className="flex flex-col gap-4 w-full max-w-sm sm:max-w-md md:max-w-lg">
+        <div className="w-full p-6 sm:p-8 bg-gray-900 rounded-xl border border-gray-700 shadow-2xl">
+          {error && (
+            <div className="mb-4 text-red-400 text-sm sm:text-base">{error}</div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-300">Email</label>
-              <input value={email} onChange={e => setEmail(e.target.value)} type="email" required className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white" />
+              <label className="block text-sm sm:text-base text-gray-300">
+                Email
+              </label>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+                className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white text-sm sm:text-base"
+              />
             </div>
+
             <div>
-              <label className="block text-sm text-gray-300">Contraseña</label>
-              <input value={password} onChange={e => setPassword(e.target.value)} type="password" required className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white" />
+              <label className="block text-sm sm:text-base text-gray-300">
+                Contraseña
+              </label>
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type="password"
+                required
+                className="w-full px-3 py-2 mt-1 bg-black/70 border border-red-600 rounded-md text-white text-sm sm:text-base"
+              />
             </div>
-            <div className="flex items-center justify-between mt-2">
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 mt-4">
               <div className="flex gap-2">
-                <button type="button" onClick={() => router.back()} className="px-4 py-2 bg-gray-700 rounded-lg text-white">Volver</button>
-                <button type="submit" disabled={loading} className="px-6 py-2 bg-red-600 rounded-xl text-white font-medium">{loading ? 'Validando...' : 'Iniciar sesión'}</button>
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="px-4 py-2 text-sm sm:text-base bg-gray-700 rounded-lg text-white hover:bg-gray-600 transition"
+                >
+                  Volver
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 text-sm sm:text-base bg-red-600 rounded-xl text-white font-medium hover:bg-red-700 transition"
+                >
+                  {loading ? "Validando..." : "Iniciar sesión"}
+                </button>
               </div>
-              <button type="button" onClick={() => router.push('/recover-password')} className="text-sm text-red-400 underline">Recuperar contraseña</button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/recover-password")}
+                className="text-sm sm:text-base text-red-400 underline hover:text-red-300"
+              >
+                Recuperar contraseña
+              </button>
             </div>
           </form>
         </div>
