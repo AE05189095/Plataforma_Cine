@@ -130,6 +130,7 @@ export default function MovieDetailPage() {
     const [showtimes, setShowtimes] = useState<ShowTime[]>([]);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [filterDate, setFilterDate] = useState<string>('');
     
     useEffect(() => {
         if (!slug) return;
@@ -247,6 +248,27 @@ export default function MovieDetailPage() {
 
         fetchData();
     }, [slug]);
+
+    // Inicializar filtro desde localStorage y escuchar cambios (limpiar desde otra vista)
+    useEffect(() => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                const saved = window.localStorage.getItem('CineGT_filterDate') || '';
+                setFilterDate(saved);
+            }
+        } catch (e) {}
+
+        const onChange = (ev: any) => {
+            try {
+                const v = ev && ev.detail ? ev.detail : '';
+                setFilterDate(v || '');
+            } catch (e) {}
+        };
+        (document as any).addEventListener('CineGT_filterDateChanged', onChange);
+        return () => {
+            try { (document as any).removeEventListener('CineGT_filterDateChanged', onChange); } catch (e) {}
+        };
+    }, []);
 
     // Real-time updates: escuchar eventos de showtimes para refrescar la vista automáticamente
     useEffect(() => {
@@ -470,23 +492,75 @@ export default function MovieDetailPage() {
                 </div>
 
                 <div className="mt-12">
-                    <h2 className="text-3xl font-bold mb-6 text-yellow-400 border-b-2 border-red-600 pb-2">
-                        {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
-                    </h2>
-                    {showtimes.length === 0 ? (
-                        <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para esta película."}</p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {showtimes.map((show) => (
-                                <MovieShowtimeCard 
-                                    key={show.id} 
-                                    show={show} 
-                                    movieSlug={movie.slug} 
-                                    isUpcoming={isUpcoming} 
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-3xl font-bold text-yellow-400 border-b-2 border-red-600 pb-2">
+                            {isUpcoming ? "Horarios de Reserva (Simulación)" : "Horarios Disponibles"}
+                        </h2>
+                        <div className="flex items-center gap-4">
+                            <label htmlFor="filter-date" className="text-sm text-gray-300 hidden sm:block">Filtrar por fecha</label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    id="filter-date"
+                                    type="date"
+                                    className="bg-gray-900 text-white px-4 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-red-600 min-w-[200px]"
+                                    value={filterDate || ''}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFilterDate(v || '');
+                                        try { if (typeof window !== 'undefined' && window.localStorage) { if (v) window.localStorage.setItem('CineGT_filterDate', v); else window.localStorage.removeItem('CineGT_filterDate'); } } catch (err) {}
+                                    }}
                                 />
-                            ))}
+                                <button
+                                    type="button"
+                                    title="Limpiar filtro"
+                                    onClick={() => {
+                                        setFilterDate('');
+                                        try { if (typeof window !== 'undefined' && window.localStorage) window.localStorage.removeItem('CineGT_filterDate'); } catch (err) {}
+                                    }}
+                                    className="px-3 py-2 bg-amber-500 text-black rounded-md font-semibold hover:bg-amber-400"
+                                >
+                                    Limpiar
+                                </button>
+                            </div>
                         </div>
-                    )}
+                    </div>
+
+                    {/* Filtrar y ordenar showtimes por fecha/hora (más cercano -> más lejano) */}
+                    {(() => {
+                        // Usar la fecha seleccionada desde el estado (formato YYYY-MM-DD)
+                        const selectedDate: string | null = filterDate || null;
+
+                        const filtered = showtimes.filter(s => {
+                            if (!selectedDate) return true;
+                            if (!s.startISO) return false;
+                            return s.startISO.slice(0,10) === selectedDate;
+                        });
+
+                        const sorted = filtered.sort((a,b) => {
+                            const ta = a.startISO ? new Date(a.startISO).getTime() : 0;
+                            const tb = b.startISO ? new Date(b.startISO).getTime() : 0;
+                            return ta - tb; // más cercano (menor timestamp) primero
+                        });
+
+                        if (sorted.length === 0) {
+                            return (
+                                <p className="text-gray-400">{isUpcoming ? `Reserva disponible a partir del ${UPCOMING_DISPLAY_DATE}.` : "No hay funciones disponibles para la fecha seleccionada."}</p>
+                            );
+                        }
+
+                        return (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {sorted.map((show) => (
+                                    <MovieShowtimeCard 
+                                        key={show.id || `${movie.slug}-${show.time}`} 
+                                        show={show} 
+                                        movieSlug={movie.slug} 
+                                        isUpcoming={isUpcoming} 
+                                    />
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
         </div>
@@ -528,6 +602,16 @@ function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; mo
         }
     }
 
+    // Mostrar fecha del showtime (si está disponible)
+    let displayDate = '';
+    if (show.startISO) {
+        try {
+            displayDate = new Date(show.startISO).toLocaleDateString('es-419', { day: '2-digit', month: 'long', year: 'numeric' });
+        } catch {
+            displayDate = '';
+        }
+    }
+
     // Limpiar nombre de sala si contiene sufijos no deseados (ej: "Sala 1 - slug-de-pelicula")
     const salaRaw = show.sala || 'Sala';
     const salaDisplay = typeof salaRaw === 'string' ? salaRaw.replace(/\s*-\s*[^-]+$/,'').trim() : String(salaRaw);
@@ -535,6 +619,9 @@ function MovieShowtimeCard({ show, movieSlug, isUpcoming }: { show: ShowTime; mo
     return (
         <div className="bg-gray-800 p-6 rounded-2xl shadow-xl transform hover:scale-[1.02] transition-all border-l-4 border-red-600 hover:bg-gray-700">
             <p className="font-extrabold text-3xl mb-1 text-red-400">{displayTime}</p>
+            {displayDate ? (
+                <p className="text-sm mb-2 text-gray-300">Fecha: <span className="font-semibold text-white">{displayDate}</span></p>
+            ) : null}
             <p className="text-lg mb-2 text-gray-300">Sala: <span className="font-semibold text-white">{salaDisplay}</span></p>
             <p className="text-sm mt-1 text-gray-400">{show.availableSeats} asientos disponibles</p>
             <div className="mt-4 flex gap-2">
