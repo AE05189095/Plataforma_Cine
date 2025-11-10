@@ -128,7 +128,7 @@ export default function HomePage() {
         loadMovies();
 
         // Refrescar automáticamente cada 15s
-        const interval = setInterval(() => { if (mounted) loadMovies(); }, 15000);
+        const interval = setInterval(() => { if (mounted) loadMovies(); }, 3000);
         return () => { mounted = false; clearInterval(interval); };
     }, []);
 
