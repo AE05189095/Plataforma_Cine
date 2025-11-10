@@ -7,6 +7,8 @@ const auth = require('./middleware/authMiddleware');
 // Definir todas las rutas de purchases
 router.post('/', auth, purchaseController.create);
 router.post('/showtimes/:showtimeId/lock-seats', auth, purchaseController.lockSeats);
+// Ruta explícita para "me" primero, para claridad
+router.get('/user/me', auth, purchaseController.listByUser);
 router.get('/user/:userId', auth, purchaseController.listByUser);
 
 // Cancelar compra

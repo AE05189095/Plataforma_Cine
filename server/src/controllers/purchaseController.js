@@ -230,10 +230,14 @@ exports.create = async (req, res) => {
 
     const confirmationCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
+    const showtimeObjectId = !isSimulated && mongoose.Types.ObjectId.isValid(showtimeId)
+      ? new mongoose.Types.ObjectId(showtimeId)
+      : showtimeId;
+
     // Crear compra
     const createdPurchase = await Purchase.create([{
       user: userId,
-      showtime: showtimeId,
+      showtime: showtimeObjectId,
       seats,
       totalPrice: totalQ,
       status: 'reserved',
@@ -270,10 +274,10 @@ exports.create = async (req, res) => {
     // Log de compra
     try {
       await Log.create([{
-        usuario: userId,
+        usuario: req.user?._id,
         role: req.user?.role || 'cliente',
         accion: 'compra',
-        descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
+        descripcion: `El usuario ${req.user?.username}realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
       }], { session });
     } catch (logErr) {
       console.error('Error registrando log de compra:', logErr);
@@ -381,19 +385,34 @@ exports.create = async (req, res) => {
 // ==========================================================
 exports.listByUser = async (req, res) => {
   try {
-    const userId = req.user?._id;
-    const purchases = await Purchase.find({ user: userId })
-      .populate({
-        path: 'showtime',
-        populate: [
-          { path: 'movie', model: 'Movie' },
-          { path: 'hall', model: 'Hall' }
-        ]
-      })
-      .sort({ createdAt: -1 })
-      .lean();
+    const authUserId = req.user?._id;
+    if (!authUserId) return res.status(401).json({ message: 'No autenticado' });
 
-    res.json(purchases);
+    // Soporta /user/me y valida acceso directo a /user/:userId
+    const requestedId = req.params?.userId;
+    if (requestedId && requestedId !== 'me' && String(requestedId) !== String(authUserId)) {
+      return res.status(403).json({ message: 'No autorizado para ver compras de otro usuario' });
+    }
+
+    let purchases;
+    try {
+      purchases = await Purchase.find({ user: authUserId })
+        .populate({
+          path: 'showtime',
+          populate: [
+            { path: 'movie', model: 'Movie' },
+            { path: 'hall', model: 'Hall' },
+          ],
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+      return res.json(purchases);
+    } catch (popErr) {
+      console.error('Error populating user purchases, returning unpopulated data:', popErr?.message || popErr);
+      // Fallback sin populate para evitar 500 por datos inconsistentes (p.ej. showtime no-ObjectId)
+      const basic = await Purchase.find({ user: authUserId }).sort({ createdAt: -1 }).lean();
+      return res.json(basic);
+    }
   } catch (err) {
     console.error('Error listing user purchases:', err);
     res.status(500).json({ message: 'Error al obtener las compras' });
@@ -441,6 +460,18 @@ exports.cancel = async (req, res) => {
       console.error('Error al actualizar el estado de la reserva:', reservationError);
     }
 
+    // ==========================================================
+    //  Liberar asientos del Showtime
+    // ==========================================================
+    try {
+      await Showtime.updateOne(
+        { _id: purchase.showtime },
+        { $pullAll: { seatsBooked: purchase.seats } }
+      );
+    } catch (showtimeError) {
+      console.error('Error liberando asientos en Showtime:', showtimeError);
+    }
+
     // Eliminar SeatLock asociados a esta compra (liberar registro en collection SeatLock)
     try {
       await SeatLock.deleteMany({ showtimeId: purchase.showtime, seatId: { $in: purchase.seats } });
@@ -450,10 +481,10 @@ exports.cancel = async (req, res) => {
     //log al cancelar compra
     try {
       await Log.create({
-        usuario: userId,
+        usuario: req.user?._id,
         role: req.user.role || "cliente",
         accion: "cancelacion",
-        descripcion: `El usuario canceló su compra con ID: ${purchase._id}`,
+        descripcion: `El usuario ${req.user.username} canceló su compra con ID: ${purchase._id}`,
       });
     } catch (logError) {
       console.error("Error al crear log de cancelación:", logError);
@@ -478,11 +509,16 @@ exports.cancel = async (req, res) => {
           $pull: { seatsLocks: { userId: purchase.user } }
         });
 
-        const cap2 = (typeof showtime?.capacity === 'number') ? showtime.capacity : (showtime?.hall?.capacity || 0);
+        const updatedShowtime = await Showtime.findById(purchase.showtime).lean();
+        const cap2 = (typeof updatedShowtime?.capacity === 'number')
+        ? updatedShowtime.capacity
+        : (updatedShowtime?.hall?.capacity || 0);
+
         io.emit('showtimeUpdated', {
-          _id: purchase.showtime,
-          seatsBooked: newSeats,
-          availableSeats: Math.max(0, cap2 - newSeats.length),
+        _id: purchase.showtime,
+        freedSeats: purchase.seats, 
+        seatsBooked: updatedShowtime?.seatsBooked || [],
+        availableSeats: Math.max(0, cap2 - (updatedShowtime?.seatsBooked?.length || 0)),
         });
       }
     } catch (err) {

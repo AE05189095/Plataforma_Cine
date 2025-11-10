@@ -12,6 +12,7 @@ import { API_BASE, TOKEN_KEY } from '@/lib/config';
 import { getPriceForHall } from '@/lib/pricing';
 import { formatCurrency } from '@/lib/format';
 import { Seat } from '@/types';
+import { io, Socket } from "socket.io-client";
 
 interface ShowtimeResponse {
   _id?: string;
@@ -203,6 +204,35 @@ export default function ComprarPage() {
       }
     };
   }, [showtimeId, fetchShowtime]);
+
+  // =============================
+// SOCKET.IO: ACTUALIZACIÓN EN TIEMPO REAL
+// =============================
+useEffect(() => {
+  if (!showtimeId) return;
+
+  // Conectamos socket.io al backend
+  const socket: Socket = io(API_BASE, {
+    transports: ["websocket"],
+  });
+
+  // Nos unimos a la sala del showtime
+  socket.emit("joinShowtime", showtimeId);
+
+  // Escuchamos cuando el backend emite cambios
+  socket.on("showtimeUpdated", (updatedShowtime) => {
+    console.log("🎥 Showtime actualizado:", updatedShowtime);
+    setOccupied(updatedShowtime.seatsBooked ?? []);
+    setReserved(updatedShowtime.seatsLocked ?? []);
+  });
+
+  // Limpieza al desmontar
+  return () => {
+    socket.emit("leaveShowtime", showtimeId);
+    socket.disconnect();
+  };
+}, [showtimeId]);
+
 
   // Refresco periódico
   useEffect(() => {
