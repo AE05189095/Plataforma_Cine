@@ -331,20 +331,19 @@ exports.create = async (req, res) => {
 
 
     // ==========================================================
-    // Preparar fecha (de compra) y hora (del showtime) para correo
+    // Preparar fecha y hora de la FUNCIÓN para el correo
     // ==========================================================
-    // La fecha a mostrar debe ser la fecha de la compra (hoy), no la fecha del showtime.
-    // Usamos el createdAt de la compra recién creada para mayor precisión.
-    const purchaseDate = new Date(createdPurchase[0].createdAt || Date.now());
-
-    // Hora mostrada: la del showtime, no la hora de compra
+    // Requisito: mostrar la fecha en que se proyectará la película (showtime), NO la fecha de compra.
+    // Compatibilidad: algunos showtimes pueden tener `startAt` Date completo; si no, se arma con `date` y `time`.
     const showtimeDate = (
       showtime.startAt instanceof Date && !isNaN(showtime.startAt)
     ) ? showtime.startAt : new Date(`${showtime.date}T${showtime.time}`);
 
-    const formattedDate = purchaseDate.toLocaleDateString('es-GT', {
+    // Fecha de la función (ej: 10 de enero de 2026)
+    const formattedShowDate = showtimeDate.toLocaleDateString('es-GT', {
       day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guatemala'
     });
+    // Hora de la función
     const formattedTime = showtimeDate.toLocaleTimeString('es-GT', {
       hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Guatemala'
     });
@@ -355,7 +354,7 @@ exports.create = async (req, res) => {
     try {
       await sendConfirmationEmail(userEmail, {
         movie: movieTitle,
-        date: formattedDate,
+        date: formattedShowDate, // Ahora se envía la fecha de la función
         time: formattedTime,
         room: showtime.hall?.name || 'Sala desconocida',
         seat: createdPurchase[0].seats.join(', '),

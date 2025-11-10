@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 // Tipos
 interface RawMovie {
+    _id?: string;
     title?: string;
     slug?: string;
     posterUrl?: string;
@@ -29,7 +30,22 @@ interface MovieData {
     releaseDate: string;
     duration: string;
     description: string;
+    id?: string;
+    slug?: string;
     isUpcoming?: boolean;
+}
+
+interface ShowtimeMovie {
+    _id?: string;
+    slug?: string;
+    title?: string;
+}
+
+interface ShowtimeItem {
+    _id?: string;
+    movie?: ShowtimeMovie | string;
+    date?: string; // 'YYYY-MM-DD'
+    startAt?: string;
 }
 
 // Lista de géneros
@@ -66,6 +82,7 @@ export default function HomePage() {
     const [selectedGenre, setSelectedGenre] = useState(ALL_GENRES[0]);
     const [selectedDate, setSelectedDate] = useState("");
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
+    const [allShowtimes, setAllShowtimes] = useState<ShowtimeItem[]>([]);
     const [apiError, setApiError] = useState(false);
     const [logoClickCount, setLogoClickCount] = useState(0);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -111,6 +128,8 @@ export default function HomePage() {
                         releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().slice(0, 10) : "",
                         duration: m.duration ? `${m.duration} min` : "N/A",
                         description: m.description || "",
+                        id: m._id,
+                        slug: m.slug,
                     };
                 });
 
@@ -127,8 +146,30 @@ export default function HomePage() {
 
         loadMovies();
 
-        // Refrescar automáticamente cada 15s
-        const interval = setInterval(() => { if (mounted) loadMovies(); }, 15000);
+        // Refrescar automáticamente cada 3s (ajustado según tu versión)
+        const interval = setInterval(() => { if (mounted) loadMovies(); }, 3000);
+        return () => { mounted = false; clearInterval(interval); };
+    }, []);
+
+    // Cargar showtimes desde API
+    useEffect(() => {
+        let mounted = true;
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+        const loadShowtimes = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/showtimes`);
+                if (!res.ok) throw new Error('Error al obtener showtimes');
+                const data = await res.json();
+                if (mounted) setAllShowtimes(Array.isArray(data) ? data as ShowtimeItem[] : []);
+            } catch (err) {
+                console.warn('Error al cargar showtimes:', err);
+                if (mounted) setAllShowtimes([]);
+            }
+        };
+
+        loadShowtimes();
+        const interval = setInterval(() => { if (mounted) loadShowtimes(); }, 15000);
         return () => { mounted = false; clearInterval(interval); };
     }, []);
 
@@ -158,11 +199,32 @@ export default function HomePage() {
         }
 
         if (selectedDate) {
-            current = current.filter(m => m.releaseDate >= selectedDate);
+            const dateNormalized = selectedDate;
+            const movieSlugSet = new Set<string>();
+
+            for (const st of allShowtimes) {
+                if (!st) continue;
+                const stDate = st.date || (st.startAt ? new Date(st.startAt).toISOString().slice(0, 10) : undefined);
+                if (!stDate) continue;
+                if (stDate === dateNormalized) {
+                    if (typeof st.movie === 'string') {
+                        movieSlugSet.add(st.movie);
+                    } else if (st.movie?.slug) {
+                        movieSlugSet.add(st.movie.slug);
+                    } else if (st.movie?.title) {
+                        movieSlugSet.add(createSlug(st.movie.title));
+                    }
+                }
+            }
+
+            current = current.filter(m => {
+                const movieSlug = m.slug?.trim() || createSlug(m.title);
+                return movieSlugSet.size === 0 ? false : movieSlugSet.has(movieSlug);
+            });
         }
 
         return current;
-    }, [allMovies, searchTerm, selectedGenre, selectedDate]);
+    }, [allMovies, searchTerm, selectedGenre, selectedDate, allShowtimes]);
 
     const handleLogoClick = () => {
         setLogoClickCount(prev => {
@@ -186,19 +248,35 @@ export default function HomePage() {
             />
 
             <main className="container mx-auto p-4 sm:p-8">
-               <section className="text-center pt-6 sm:pt-10 pb-10 sm:pb-16 px-4">
+                <section className="text-center pt-6 sm:pt-10 pb-10 sm:pb-16 px-4">
                     <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold text-orange-500 mb-3 leading-tight">
                         Cartelera CineGT
                     </h1>
                     <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-2xl mx-auto">
                         Disfruta del mejor cine en Guatemala con la experiencia cinematográfica más emocionante
                     </p>
-                    </section>
+                </section>
+
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pb-10">
                     {filteredMovies.length > 0 ? (
-                        filteredMovies.map((movie, index) => (
-                            <MovieCard key={movie.title + index} {...movie} />
-                        ))
+                        filteredMovies.map((movie, index) => {
+                            const count = allShowtimes.filter(st => {
+                                if (!st) return false;
+                                const movieId = movie.id;
+                                if (movieId) {
+                                    if (typeof st.movie === 'string') return st.movie === movieId;
+                                    if (st.movie?._id) return st.movie._id === movieId;
+                                }
+
+                                const movieSlug = movie.slug || createSlug(movie.title);
+                                if (typeof st.movie === 'string') return st.movie === movieSlug;
+                                if (st.movie?.slug) return st.movie.slug === movieSlug;
+                                if (st.movie?.title) return createSlug(st.movie.title) === movieSlug;
+                                return false;
+                            }).length;
+
+                            return <MovieCard key={movie.title + index} {...movie} showtimesCount={count} />;
+                        })
                     ) : (
                         <div className="col-span-full text-center">
                             {apiError ? (
