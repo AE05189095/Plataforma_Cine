@@ -170,7 +170,7 @@ export default function MovieDetailPage() {
                     description: movieJson.description || '',
                     slug: movieJson.slug || slug,
                     // RawMovieResponse may not declare _id in the type; usar cast seguro
-                    _id: (movieJson as any)._id || undefined,
+                    _id: (movieJson as RawMovieResponse & { _id?: string })._id || undefined,
                 };
                 
                 // Usar getImageURL con los datos obtenidos
@@ -254,9 +254,20 @@ export default function MovieDetailPage() {
         // conectar socket una sola vez y mantener referencia
         const socket: Socket = io(API_BASE, { transports: ['websocket', 'polling'] });
         // guardamos socket en ref para poder usarlo en otros efectos si hace falta
-        (window as any).__client_movie_socket = (window as any).__client_movie_socket || socket;
+    const w = window as typeof window & { __client_movie_socket?: Socket };
+    w.__client_movie_socket = w.__client_movie_socket || socket;
 
-        const handleCreated = (st: any) => {
+        interface IncomingShowtime {
+            _id?: string;
+            movie?: { slug?: string; _id?: string; title?: string } | string;
+            startAt?: string;
+            time?: string;
+            hall?: { name?: string; capacity?: number } | string;
+            seatsBooked?: string[];
+            availableSeats?: number;
+            price?: number;
+        }
+        const handleCreated = (st: IncomingShowtime) => {
             try {
                 if (!st || !st.movie) return;
                 // Preferir comparación por _id si la película local lo tiene, sino por slug
@@ -292,7 +303,7 @@ export default function MovieDetailPage() {
             } catch (e) { console.warn('Error manejando showtimeCreated socket', e); }
         };
 
-        const handleUpdated = (st: any) => {
+    const handleUpdated = (st: IncomingShowtime) => {
             try {
                 if (!st || !st.movie) return;
                 const localMovieId = movie?._id;
@@ -322,7 +333,7 @@ export default function MovieDetailPage() {
             } catch (e) { console.warn('Error manejando showtimeUpdated socket', e); }
         };
 
-        const handleRemoved = (payload: any) => {
+    const handleRemoved = (payload: { id?: string; _id?: string } | null) => {
             try {
                 const id = payload && (payload.id || payload._id) ? (payload.id || payload._id) : null;
                 if (!id) return;
@@ -339,42 +350,47 @@ export default function MovieDetailPage() {
             socket.off('showtimeUpdated', handleUpdated);
             socket.off('showtimeRemoved', handleRemoved);
             // sólo desconectar si es la misma instancia creada aquí
-            try { socket.disconnect(); } catch (e) {}
+            try { socket.disconnect(); } catch { /* ignore */ }
         };
     }, [slug, movie]);
 
     // Suscribirse a actualizaciones puntuales de availableSeats por showtime
     useEffect(() => {
-        const socket: Socket | undefined = (window as any).__client_movie_socket;
+    const w2 = window as typeof window & { __client_movie_socket?: Socket; __movie_listeners?: Record<string, (...args: unknown[]) => void> };
+    const socket: Socket | undefined = w2.__client_movie_socket;
         if (!socket) return;
 
         const subscribed = new Set<string>();
 
-        const attach = (id: string) => {
+    const attach = (id: string) => {
             if (!id || subscribed.has(id)) return;
             subscribed.add(id);
             const ev = `updateAvailableSeats-${id}`;
-            const handler = (payload: any) => {
+            const handler = (payload: { availableSeats?: number; seatsBooked?: string[] } | null) => {
                 try {
                     setShowtimes(prev => prev.map(s => {
                         if (s.id !== id) return s;
-                        const avail = (payload && typeof payload.availableSeats === 'number') ? payload.availableSeats : (typeof payload.availableSeats === 'undefined' && Array.isArray(payload && payload.seatsBooked) ? Math.max(0, (s as any).capacity - payload.seatsBooked.length) : s.availableSeats);
+                        const avail = (payload && typeof payload.availableSeats === 'number')
+                            ? payload.availableSeats
+                            : (payload && Array.isArray(payload.seatsBooked)
+                                ? Math.max(0, s.availableSeats)
+                                : s.availableSeats);
                         return { ...s, availableSeats: typeof avail === 'number' ? avail : s.availableSeats };
                     }));
                 } catch (e) { console.warn('Error handling updateAvailableSeats payload', e); }
             };
             socket.on(ev, handler);
             // store for cleanup
-            (socket as any).__movie_listeners = (socket as any).__movie_listeners || {};
-            (socket as any).__movie_listeners[ev] = handler;
+            w2.__movie_listeners = w2.__movie_listeners || {};
+            w2.__movie_listeners[ev] = handler as unknown as (...args: unknown[]) => void;
         };
 
         const detachAll = () => {
-            const listeners = (socket as any).__movie_listeners || {};
+            const listeners = w2.__movie_listeners || {};
             Object.keys(listeners).forEach(ev => {
-                try { socket.off(ev, listeners[ev]); } catch (e) {}
+                try { socket.off(ev, listeners[ev]); } catch { /* ignore */ }
             });
-            (socket as any).__movie_listeners = {};
+            w2.__movie_listeners = {};
         };
 
         // Attach for current showtimes
@@ -390,7 +406,7 @@ export default function MovieDetailPage() {
     if (loading) {
         return (
             <div className="min-h-screen bg-black text-white p-8">
-                <Header />
+                <Header hideFilters />
                 <div className="mt-24 text-center">Cargando película y horarios...</div>
             </div>
         );
@@ -406,7 +422,7 @@ export default function MovieDetailPage() {
     if (notFound || !movie) {
         return (
             <div className="min-h-screen bg-black text-white p-8 text-center">
-                <Header /> 
+                <Header hideFilters /> 
                 <h1 className="text-4xl mt-20 text-red-600">Película no encontrada 😢</h1>
                 <p className="text-lg text-gray-400 mt-4">El identificador de la película no es válido: <strong>{slug}</strong></p>
             </div>
@@ -415,7 +431,7 @@ export default function MovieDetailPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
-            <Header />
+            <Header hideFilters />
             <div className="p-4 sm:p-8 md:p-12 lg:p-16">
                 <div className="flex flex-col md:flex-row gap-8 mb-12">
                     {/* Contenedor de la Imagen */}

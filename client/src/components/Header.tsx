@@ -14,6 +14,7 @@ type HeaderProps = {
     selectedDate?: string;
     setSelectedDate?: Dispatch<SetStateAction<string>>;
     onLogoClick?: () => void;
+  hideFilters?: boolean; // Fuerza ocultar filtros desde la página llamante
 };
 
 // Componente de encabezado
@@ -29,8 +30,10 @@ export default function Header(props: HeaderProps = {}) {
   const isAdminSection = pathname?.startsWith('/admin');
   // Ocultar filtros también en la vista de detalle de película
   const isMovieDetailPage = pathname?.startsWith('/movies/');
+  // Ocultar filtros en el mapa de asientos/compra
+  const isPurchasePage = pathname?.startsWith('/comprar');
   // Bandera final para ocultar filtros
-  const hideFilters = isAdminSection || isMovieDetailPage;
+  const hideFilters = props.hideFilters || isAdminSection || isMovieDetailPage || isPurchasePage;
 
     // Lógica de autenticación (sin cambios)
   useEffect(() => {

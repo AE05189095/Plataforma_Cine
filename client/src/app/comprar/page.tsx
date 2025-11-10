@@ -356,7 +356,7 @@ export default function ComprarPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-b from-black via-gray-900 to-black text-white">
-        <Header />
+  <Header hideFilters />
         
                     <main className="min-h-screen w-full overflow-x-hidden p-4 sm:p-6 md:p-8 bg-black text-white">
           <div className="max-w-6xl mx-auto w-full">
