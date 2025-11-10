@@ -277,7 +277,7 @@ exports.create = async (req, res) => {
         usuario: req.user?._id,
         role: req.user?.role || 'cliente',
         accion: 'compra',
-        descripcion: `El usuario ${req.user?.username}realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
+        descripcion: `El usuario realizó una compra de ${seats.length} asiento(s) para "${movieTitle}" con total Q${totalQ.toFixed(2)}. Código: ${confirmationCode}`,
       }], { session });
     } catch (logErr) {
       console.error('Error registrando log de compra:', logErr);
@@ -484,7 +484,7 @@ exports.cancel = async (req, res) => {
         usuario: req.user?._id,
         role: req.user.role || "cliente",
         accion: "cancelacion",
-        descripcion: `El usuario ${req.user.username} canceló su compra con ID: ${purchase._id}`,
+        descripcion: `El usuario canceló su compra con ID: ${purchase._id}`,
       });
     } catch (logError) {
       console.error("Error al crear log de cancelación:", logError);
