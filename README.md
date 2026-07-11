@@ -1,8 +1,7 @@
 # Plataforma Cine - Cómo ejecutar el proyecto (VS Code)
 
-Instrucciones simples para usar el Terminal integrado de Visual Studio Code (PowerShell). Explicación corta y comandos listos para copiar.
 
-Partes del repo:
+Repo:
 
 - `client/` → Next.js (app React)
 - `server/` → API con Express y MongoDB
